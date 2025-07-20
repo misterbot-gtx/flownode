@@ -13,6 +13,7 @@ interface GroupNodeProps extends NodeProps {
   childNodes?: Node[];
 }
 
+
 // Componente simplificado para renderizar nós filhos dentro do grupo
 const GroupChildNode = memo(({ node, index }: { node: Node; index: number }) => {
   const nodeData = node.data as any;
@@ -51,17 +52,13 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const [isEditing, setIsEditing] = useState(groupData.isEditing || false);
   const [title, setTitle] = useState(groupData.title || 'Group #1');
 
+  console.log('Node Group:', JSON.stringify(groupData, null, 2));
+
   // Usar childNodes dos dados
   const childNodes = groupData.childNodes || [];
-  
-  // Debug log
-  console.log(`GroupNode ${id} - childNodes:`, childNodes);
-  console.log(`GroupNode ${id} - childNodes length:`, childNodes.length);
-  console.log(`GroupNode ${id} - groupData:`, groupData);
 
   // Monitorar mudanças nos childNodes
   useEffect(() => {
-    console.log(`GroupNode ${id} - childNodes changed:`, childNodes);
   }, [childNodes, id]);
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -71,7 +68,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
 
   const handleTitleSave = () => {
     setIsEditing(false);
-    // Aqui você salvaria o título no estado global
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -100,15 +96,8 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-    console.log('Drop detected in GroupNode:', id);
-    console.log('Current childNodes after drop:', childNodes);
-    
-    // Não processar o drop aqui, deixar o handler principal do FlowBuilder processar
-    // Apenas marcar que este grupo deve receber o elemento
     const elementData = e.dataTransfer.getData('application/reactflow');
     if (elementData) {
-      console.log('Element data found in GroupNode drop:', elementData);
-      // Emitir um evento customizado para o FlowBuilder processar
       const customEvent = new CustomEvent('groupDrop', {
         detail: {
           groupId: id,
@@ -204,21 +193,15 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         type="target"
         position={Position.Top}
         className="absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-2 border-primary bg-background transition-transform"
-        style={{ top: '-5px' }}
+        style={{ top: '-1px', width: 7  }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         className="absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-2 border-primary bg-background transition-transform"
-        style={{ bottom: '-5px' }}
+        style={{ bottom: '-1px', width: 7 }}
       />
       
-      {/* Add Connection Button */}
-      {(isHovered || selected) && (
-        <button className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 p-1.5 bg-primary rounded-full hover:bg-primary/80 transition-colors shadow-lg">
-          <Plus className="w-4 h-4 text-primary-foreground" />
-        </button>
-      )}
     </div>
   );
 });

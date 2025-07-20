@@ -168,25 +168,22 @@ All colors MUST be HSL.
   stroke-dasharray: 5,5;
 }
 
-.react-flow__handle {
-  background: hsl(var(--background));
-  border: 2px solid hsl(var(--primary));
-}
-
-/* Flow Node Animations */
-@keyframes nodeAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.8) translateY(20px);
-  }
+@keyframes dashdraw {
   to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
+    stroke-dashoffset: -20;
   }
 }
 
-.react-flow__node {
-  animation: nodeAppear 0.3s ease-out;
+.react-flow__edge-path.robot-line {
+  stroke: #ffffff;
+  stroke-width: 0.5;
+  stroke-dasharray: 7 5;
+  animation: dashdraw 1s linear infinite;
+}
+
+.react-flow__handle {
+  border: 2px solid #ffffff;
+  background: #23272f;
 }
 
 /* Drag and Drop Styles */

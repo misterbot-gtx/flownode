@@ -6,6 +6,13 @@ export interface FlowElement {
   icon: string;
   description?: string;
 }
+export interface FlowNodeData {
+  label: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  isEditing?: boolean;
+  element: FlowElement;
+}
 
 export interface FlowNode {
   id: string;

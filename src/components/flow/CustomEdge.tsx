@@ -1,36 +1,78 @@
-import { EdgeProps } from '@xyflow/react';
+import { useCallback } from 'react';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
+  useReactFlow,
+} from '@xyflow/react';
+import { X } from 'lucide-react';
 
-function getEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
-  // Curva suave (bezier) horizontal
-  const curvature = 0.3;
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const cpx1 = sourceX + dx * curvature;
-  const cpy1 = sourceY;
-  const cpx2 = targetX - dx * curvature;
-  const cpy2 = targetY;
-  return `M ${sourceX},${sourceY} C ${cpx1},${cpy1} ${cpx2},${cpy2} ${targetX},${targetY}`;
+interface CustomEdgeProps {
+  id: string;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  sourcePosition: any;
+  targetPosition: any;
+  style?: React.CSSProperties;
+  markerEnd?: string;
+  data?: {
+    showDelete?: boolean;
+  };
+  isInteracting?: boolean; // New prop to detect flow interaction
 }
 
-export function CustomEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, style }: EdgeProps) {
-  const edgePath = getEdgePath(sourceX, sourceY, targetX, targetY);
-  const edgeStyle = {
-    stroke: '#ffffff',
-    strokeWidth: 0.5,
-    strokeDasharray: '7 5',
-    animation: 'dashdraw 1s linear infinite',
-    ...style,
-  };
+export function CustomEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  data,
+  isInteracting = false, // Default to false if not provided
+}: CustomEdgeProps) {
+  const { setEdges } = useReactFlow();
+
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const onDelete = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    setEdges((edges) => edges.filter((edge) => edge.id !== id));
+  }, [id, setEdges]);
+
   return (
-    <g>
-      <path
-        id={id}
-        style={edgeStyle}
-        className="react-flow__edge-path robot-line"
-        d={edgePath}
-        markerEnd={markerEnd}
-        fill="none"
-      />
-    </g>
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      {data?.showDelete && !isInteracting && (
+        <EdgeLabelRenderer>
+          <div
+            className="absolute pointer-events-auto"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            }}
+          >
+            <button
+              onClick={onDelete}
+              className="w-4 h-4 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-700 hover:scale-110 transition-transform duration-200 border border-white/20"
+              title="Excluir conexão"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 }

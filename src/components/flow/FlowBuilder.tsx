@@ -34,15 +34,17 @@ export function FlowBuilder() {
           onConnect={flow.onConnect}
           nodeTypes={flow.nodeTypes}
           edgeTypes={flow.edgeTypes}
+          onEdgeClick={flow.onEdgeClick}
           onInit={flow.onInit}
           fitView={flow.fitView}
           className="bg-flow-canvas"
           attributionPosition="bottom-left"
           connectionLineType={ConnectionLineType.SmoothStep}
-          connectionLineStyle={{ stroke: '#ffffff', strokeWidth: 0.5, strokeDasharray: '7 5', animation: 'dashdraw 1s linear infinite' }}
+          connectionLineStyle={{ stroke: '#9aa1cd', strokeWidth: 0.5, strokeDasharray: '7 5', animation: 'dashdraw 1s linear infinite' }}
+          onPaneClick={flow.onPaneClick}
         >
           <Controls className="bg-flow-node border-none border-border/20 rounded-lg shadow-lg" position="bottom-right" />
-          <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="bottom-left" />
+          <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="top-right" />
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#374151" />
         </ReactFlow>
       </div>

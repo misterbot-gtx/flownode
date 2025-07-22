@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   useNodesState,
   useEdgesState,
-  addEdge,
   Connection,
   Edge,
   Node,
@@ -46,22 +45,29 @@ const initialNodes: Node[] = [
 
 const initialEdges: Edge[] = [];
 
-function handleConnect(params: Connection, setEdges: (fn: (edges: Edge[]) => Edge[]) => void, nodes: Node[]) {
+function handleConnect(params: Connection, setEdges: (fn: (edges: Edge[]) => Edge[]) => void, nodes: Node[], edges: Edge[]) {
   const sourceId = params.source;
   const targetId = params.target;
+  // Se o source for o startNode, remova qualquer edge existente com esse source
+  const startNode = nodes.find(n => n.type === 'startNode');
+  let newEdges = edges;
+  if (startNode && sourceId === startNode.id) {
+    newEdges = edges.filter(e => e.source !== sourceId);
+  }
   const newEdge = {
     id: `edge-${sourceId}-${targetId}`,
     source: sourceId,
     target: targetId,
-    type: 'smoothstep',
+    type: 'custom',
     style: {
       stroke: '#ffffff',
       strokeWidth: 0.5,
       strokeDasharray: '7 5',
       animation: 'dashdraw 1s linear infinite',
+      cursor: 'pointer',
     },
   };
-  setEdges((eds) => [...eds, newEdge]);
+  setEdges(() => [...newEdges, newEdge]);
 }
 
 export function useFlowLogic() {
@@ -75,6 +81,27 @@ export function useFlowLogic() {
     elementData: string;
     position: { x: number; y: number };
   } | null>(null);
+
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    setEdges((edges) =>
+      edges.map((e) =>
+        e.id === edge.id
+          ? { ...e, data: { ...(e.data || {}), showDelete: true } }
+          : { ...e, data: { ...(e.data || {}), showDelete: false } }
+      )
+    );
+    setSelectedEdgeId(edge.id);
+  }, [setEdges]);
+
+  // Função para deselecionar edges ao clicar fora
+  const clearEdgeSelection = useCallback(() => {
+    setEdges((edges) =>
+      edges.map((e) => ({ ...e, data: { ...(e.data || {}), showDelete: false } }))
+    );
+    setSelectedEdgeId(null);
+  }, [setEdges]);
 
   useEffect(() => {
     const handleGroupDrop = (event: CustomEvent) => {
@@ -145,8 +172,8 @@ export function useFlowLogic() {
   }, [pendingGroupDrop]);
 
   const onConnect = useCallback(
-    (params: Connection) => handleConnect(params, setEdges, nodes),
-    [setEdges, nodes]
+    (params: Connection) => handleConnect(params, setEdges, nodes, edges),
+    [setEdges, nodes, edges]
   );
 
   const handleNodesChange = useCallback(
@@ -217,7 +244,7 @@ export function useFlowLogic() {
         const groupHeight = Math.max(baseHeight, childHeight);
         const groupWidth = 320;
         const tolerance = 10;
-        const isInsideGroup = 
+        const isInsideGroup =
           dropPosition.x >= (node.position.x - tolerance) &&
           dropPosition.x <= (node.position.x + groupWidth + tolerance) &&
           dropPosition.y >= (node.position.y - tolerance) &&
@@ -315,9 +342,7 @@ export function useFlowLogic() {
     };
     setNodes((nds) => {
       const newNodes = nds.concat(newGroup);
-      if (reactFlowRef.current) {
-        reactFlowRef.current.fitView({ padding: 0.1, nodes: newNodes });
-      }
+      // Removido: ajuste automático da visualização (fitView)
       return newNodes;
     });
     setGroupId((id) => id + 1);
@@ -326,6 +351,8 @@ export function useFlowLogic() {
   const nodeColor = useMemo(() => {
     return (node: Node) => {
       switch (node.type) {
+        case 'startNode':
+          return '#16a34a';
         case 'groupNode':
           return '#1a1a2e';
         case 'flowNode':
@@ -377,6 +404,8 @@ export function useFlowLogic() {
     edgeTypes: {
       custom: CustomEdge,
     },
+    selectedEdgeId,
+    onEdgeClick,
     onInit: (instance: ReactFlowInstance) => {
       reactFlowRef.current = instance;
     },
@@ -385,5 +414,7 @@ export function useFlowLogic() {
     onDrop,
     onDragOver,
     createGroup,
+    // Adiciona handler para limpar seleção de edge
+    onPaneClick: clearEdgeSelection,
   };
 } 

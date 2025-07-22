@@ -8,6 +8,8 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --black: 0 0% 0%;
+
     --background: 220 13% 9%;
     --foreground: 220 9% 93%;
 
@@ -126,15 +128,22 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+.scroll{
+  scrollbar-width: none;
+}
 
 /* React Flow Custom Styles */
 .react-flow__background {
   background-color: hsl(var(--flow-canvas));
 }
+.react-flow__edge:focus path{
+  stroke: rgb(221 0 0) !important;
+}
 
 .react-flow__minimap {
   background-color: hsl(var(--flow-node));
   border: 1px solid hsl(var(--border));
+  border-radius: 0px;
 }
 
 .react-flow__controls {
@@ -144,8 +153,8 @@ All colors MUST be HSL.
 
 .react-flow__controls-button {
   background-color: hsl(var(--flow-node));
-  color: hsl(var(--foreground));
   border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--black)) !important;
 }
 
 .react-flow__controls-button:hover {
@@ -165,7 +174,7 @@ All colors MUST be HSL.
 .react-flow__connection-line {
   stroke: hsl(var(--primary));
   stroke-width: 2;
-  stroke-dasharray: 5,5;
+  stroke-dasharray: 5, 5;
 }
 
 @keyframes dashdraw {
@@ -184,6 +193,10 @@ All colors MUST be HSL.
 .react-flow__handle {
   border: 2px solid #ffffff;
   background: #23272f;
+}
+
+.react-flow__panel.react-flow__attribution.bottom.left {
+  display: none;
 }
 
 /* Drag and Drop Styles */

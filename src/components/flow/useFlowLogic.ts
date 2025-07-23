@@ -48,12 +48,8 @@ const initialEdges: Edge[] = [];
 function handleConnect(params: Connection, setEdges: (fn: (edges: Edge[]) => Edge[]) => void, nodes: Node[], edges: Edge[]) {
   const sourceId = params.source;
   const targetId = params.target;
-  // Se o source for o startNode, remova qualquer edge existente com esse source
-  const startNode = nodes.find(n => n.type === 'startNode');
-  let newEdges = edges;
-  if (startNode && sourceId === startNode.id) {
-    newEdges = edges.filter(e => e.source !== sourceId);
-  }
+  // Permitir apenas uma conexão de saída por nó: remove todas as edges com source igual ao sourceId
+  const newEdges = edges.filter(e => e.source !== sourceId);
   const newEdge = {
     id: `edge-${sourceId}-${targetId}`,
     source: sourceId,
@@ -81,6 +77,8 @@ export function useFlowLogic() {
     elementData: string;
     position: { x: number; y: number };
   } | null>(null);
+
+  // Remover box selection state e handlers
 
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -176,37 +174,12 @@ export function useFlowLogic() {
     [setEdges, nodes, edges]
   );
 
+  // Substituir handleNodesChange por repasse direto do onNodesChange
   const handleNodesChange = useCallback(
     (changes: any[]) => {
-      const processedChanges: any[] = [];
-      changes.forEach((change) => {
-        if (change.type === 'position') {
-          const node = nodes.find((n) => n.id === change.id);
-          if (node && node.parentId) {
-            if (change.dragging) {
-              const deltaX = change.position.x - node.position.x;
-              const deltaY = change.position.y - node.position.y;
-              const parentGroup = nodes.find((n) => n.id === node.parentId);
-              if (parentGroup) {
-                processedChanges.push({
-                  type: 'position',
-                  id: parentGroup.id,
-                  position: {
-                    x: parentGroup.position.x + deltaX,
-                    y: parentGroup.position.y + deltaY,
-                  },
-                  dragging: true,
-                });
-              }
-            }
-            return;
-          }
-        }
-        processedChanges.push(change);
-      });
-      onNodesChange(processedChanges);
+      onNodesChange(changes);
     },
-    [nodes, onNodesChange]
+    [onNodesChange]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -300,6 +273,7 @@ export function useFlowLogic() {
         },
         parentId: parentId,
       };
+      console.log('Novo elemento criado:', newNode);
       setNodes((nds) => {
         const newNodes = nds.concat(newNode);
         setTimeout(() => {
@@ -388,10 +362,17 @@ export function useFlowLogic() {
     });
   }, [visibleNodes, nodes]);
 
+  const processedEdges = useMemo(() => {
+    return edges.map(edge => ({
+      ...edge,
+      type: 'custom',
+    }));
+  }, [edges]);
+
   return {
     nodes: processedNodes,
-    edges,
-    onNodesChange: handleNodesChange,
+    edges: processedEdges,
+    onNodesChange,
     onEdgesChange,
     onConnect,
     nodeTypes: {
@@ -414,7 +395,8 @@ export function useFlowLogic() {
     onDrop,
     onDragOver,
     createGroup,
-    // Adiciona handler para limpar seleção de edge
     onPaneClick: clearEdgeSelection,
+    reactFlowRef, // exporta a ref
+    // Remover exportação dos handlers de box selection
   };
 } 

@@ -20,7 +20,8 @@ interface CustomEdgeProps {
   data?: {
     showDelete?: boolean;
   };
-  isInteracting?: boolean; // New prop to detect flow interaction
+  isInteracting?: boolean;
+  selected?: boolean;
 }
 
 export function CustomEdge({
@@ -34,7 +35,7 @@ export function CustomEdge({
   style = {},
   markerEnd,
   data,
-  isInteracting = false, // Default to false if not provided
+  selected = false,
 }: CustomEdgeProps) {
   const { setEdges } = useReactFlow();
 
@@ -47,15 +48,22 @@ export function CustomEdge({
     targetPosition,
   });
 
-  const onDelete = useCallback((event: React.MouseEvent) => {
-    event.stopPropagation();
-    setEdges((edges) => edges.filter((edge) => edge.id !== id));
-  }, [id, setEdges]);
+  const onDelete = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      setEdges((edges) => edges.filter((edge) => edge.id !== id));
+    },
+    [id, setEdges]
+  );
+
+  const edgeStyle = selected
+    ? { ...style, stroke: '#750e0e', strokeWidth: 3 }
+    : style;
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
-      {data?.showDelete && !isInteracting && (
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyle} />
+      {data?.showDelete && selected && (
         <EdgeLabelRenderer>
           <div
             className="absolute pointer-events-auto"

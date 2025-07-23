@@ -136,9 +136,6 @@ All colors MUST be HSL.
 .react-flow__background {
   background-color: hsl(var(--flow-canvas));
 }
-.react-flow__edge:focus path{
-  stroke: rgb(221 0 0) !important;
-}
 
 .react-flow__minimap {
   background-color: hsl(var(--flow-node));
@@ -198,7 +195,10 @@ All colors MUST be HSL.
 .react-flow__panel.react-flow__attribution.bottom.left {
   display: none;
 }
-
+/* Hide selection */
+.react-flow__nodesselection.react-flow__container.nopan {
+  display: none;
+}
 /* Drag and Drop Styles */
 .dnd-dragging {
   opacity: 0.5;
@@ -208,4 +208,16 @@ All colors MUST be HSL.
 .dnd-drop-zone {
   background: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--accent) / 0.1));
   border: 2px dashed hsl(var(--primary) / 0.3);
+}
+
+/* Box de seleção customizado */
+.react-flow__selection {
+  position: absolute !important;
+  background: rgba(59, 130, 246, 0.10) !important; 
+  border: 1px solid #3b82f6 !important;
+  box-shadow: 0 2px 12px 0 rgba(59, 130, 246, 0.10) !important;
+  border-radius: 8px !important;
+  z-index: 50 !important;
+  pointer-events: none !important;
+  transition: box-shadow 0.2s, border 0.2s, background 0.2s !important;
 }

@@ -89,8 +89,8 @@ export function FlowBuilder() {
           zoomOnScroll={false}
           multiSelectionKeyCode="Shift"
         >
-          <Controls className="bg-flow-node border-none border-border/20 rounded-lg shadow-lg" position="bottom-right" />
-          <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="top-right" />
+          <Controls className="bg-flow-node border-none border-border/20 rounded-lg shadow-lg" position="top-right" />
+          <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="bottom-right" />
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#374151" />
         </ReactFlow>
       </div>

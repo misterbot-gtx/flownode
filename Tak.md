@@ -1,8 +1,6 @@
 # 📌 Lista de Melhorias e Atualizações
 
 
-- Corrigir a logica de seleção Efeito visual bugado ao selecionar 3 ele tira o efeito visual de 1.
-
 ## 1. 🔄 Melhorias na Lógica de Drag & Drop
 
 - Ao arrastar um item da **sidebar**, ele **não deve ficar transparente** e sim como realmente tivesse tirado o elemento e nele o campo fique vazio.

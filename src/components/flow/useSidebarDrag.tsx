@@ -1,12 +1,7 @@
 import { useState, useRef } from 'react';
-import { Search, ChevronDown, ChevronRight } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { ELEMENT_CATEGORIES } from '@/data/flowElements';
 import { FlowElement } from '@/types/flow';
-
-interface DraggableElementProps {
-  element: FlowElement;
-}
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 // Estilo melhorado para o drag preview
 const draggingStyle = `
@@ -17,7 +12,6 @@ const draggingStyle = `
     transform: rotate(0deg);
     transition: transform 0.2s ease, box-shadow 0.2s, border 0.2s;
   }
-
   .dragging-previews {
     width: 18rem;
     border: 3px solid #ea580c;
@@ -33,7 +27,6 @@ const draggingStyle = `
     padding: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
-
   .react-flow__node-dragging {
     opacity: 0 !important;
   }
@@ -48,7 +41,13 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
-function DraggableElement({ element, draggingElementId, setDraggingElementId }: DraggableElementProps & { draggingElementId: string | null, setDraggingElementId: (id: string | null) => void }) {
+interface DraggableElementProps {
+  element: FlowElement;
+  draggingElementId: string | null;
+  setDraggingElementId: (id: string | null) => void;
+}
+
+export function DraggableElement({ element, draggingElementId, setDraggingElementId }: DraggableElementProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragElementRef = useRef<HTMLDivElement | null>(null);
   const dragDivRef = useRef<HTMLDivElement>(null);
@@ -58,7 +57,6 @@ function DraggableElement({ element, draggingElementId, setDraggingElementId }: 
   const createCustomPreview = (startEvent: DragEvent) => {
     setIsDragging(true);
     document.body.style.userSelect = 'none';
-    document.documentElement.style.overflow = 'hidden';
     const dragEl = document.createElement('div');
     dragEl.className = 'dragging-previews';
     dragEl.style.position = 'fixed';
@@ -139,7 +137,6 @@ function DraggableElement({ element, draggingElementId, setDraggingElementId }: 
       dragElementRef.current = null;
     }
     document.body.style.userSelect = '';
-    document.documentElement.style.overflow = '';
     // Remove listeners globais
     if (globalListenerRef.current) {
       window.removeEventListener('drop', globalListenerRef.current.drop);
@@ -175,7 +172,7 @@ function DraggableElement({ element, draggingElementId, setDraggingElementId }: 
       <div
         className="flex items-center gap-3 p-3 rounded-lg bg-flow-sidebar-item border border-border/20 transition-all duration-200 dragging-element"
         style={{ minHeight: 53 }}
-      />
+      ></div>
     );
   }
 
@@ -198,9 +195,11 @@ function DraggableElement({ element, draggingElementId, setDraggingElementId }: 
 interface CategorySectionProps {
   category: keyof typeof ELEMENT_CATEGORIES;
   searchTerm: string;
+  draggingElementId: string | null;
+  setDraggingElementId: (id: string | null) => void;
 }
 
-function CategorySection({ category, searchTerm, draggingElementId, setDraggingElementId }: CategorySectionProps & { draggingElementId: string | null, setDraggingElementId: (id: string | null) => void }) {
+export function CategorySection({ category, searchTerm, draggingElementId, setDraggingElementId }: CategorySectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const categoryData = ELEMENT_CATEGORIES[category];
 
@@ -244,13 +243,9 @@ function CategorySection({ category, searchTerm, draggingElementId, setDraggingE
   );
 }
 
-interface FlowSidebarProps {
-  className?: string;
-}
-
-export function FlowSidebar({ className }: FlowSidebarProps) {
+export function useSidebarDrag() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [draggingElementId, setDraggingElementId] = useState<string | null>(null); // <-- Adicionado
+  const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
 
   // Impede drop dentro do sidebar
   const handleSidebarDrop = (event: React.DragEvent) => {
@@ -258,39 +253,11 @@ export function FlowSidebar({ className }: FlowSidebarProps) {
     event.stopPropagation();
   };
 
-  return (
-    <div
-      className={`w-80 bg-flow-sidebar border-r border-border/20 flex flex-col ${className}`}
-      onDrop={handleSidebarDrop}
-    >
-      {/* Header */}
-      <div className="p-4 border-b border-border/20">
-        <h2 className="text-lg font-bold text-foreground mb-4">Elementos</h2>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar elementos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-flow-sidebar-item border-border/30 focus:border-primary"
-          />
-        </div>
-      </div>
-
-      {/* Categories */}
-      <div className="scroll flex-1 overflow-y-auto p-4 space-y-6">
-        {Object.keys(ELEMENT_CATEGORIES).map((category) => (
-          <CategorySection
-            key={category}
-            category={category as keyof typeof ELEMENT_CATEGORIES}
-            searchTerm={searchTerm}
-            draggingElementId={draggingElementId}
-            setDraggingElementId={setDraggingElementId}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+  return {
+    searchTerm,
+    setSearchTerm,
+    draggingElementId,
+    setDraggingElementId,
+    handleSidebarDrop,
+  };
+} 

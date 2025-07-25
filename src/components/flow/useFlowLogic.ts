@@ -177,7 +177,14 @@ export function useFlowLogic() {
   // Substituir handleNodesChange por repasse direto do onNodesChange
   const handleNodesChange = useCallback(
     (changes: any[]) => {
-      onNodesChange(changes);
+      // Intercepta remoção do node 'start'
+      const filteredChanges = changes.filter(change => {
+        if (change.type === 'remove' && change.id === 'start') {
+          return false; // bloqueia remoção do start
+        }
+        return true;
+      });
+      onNodesChange(filteredChanges);
     },
     [onNodesChange]
   );
@@ -372,7 +379,7 @@ export function useFlowLogic() {
   return {
     nodes: processedNodes,
     edges: processedEdges,
-    onNodesChange,
+    onNodesChange: handleNodesChange,
     onEdgesChange,
     onConnect,
     nodeTypes: {

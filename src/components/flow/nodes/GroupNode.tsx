@@ -108,7 +108,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragOver(true);
 
     if (dragRef.current && localChildNodes.length > 0) {
@@ -125,7 +124,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragOver(false);
     setDragOverIndex(-1);
   };
@@ -242,7 +240,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         ) : localChildNodes && localChildNodes.length > 0 ? (
           <div className="space-y-2">
             {localChildNodes.map((childNode, index) => (
-              <div key={childNode.id}>
+              <div key={childNode.id + '-' + index}>
                 {index === dragOverIndex && isDragOver && (
                   <div className="w-full h-14 mb-2 mt-2 bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-lg rounded">
                     

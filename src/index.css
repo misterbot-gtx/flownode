@@ -128,7 +128,8 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
-.scroll{
+
+.scroll {
   scrollbar-width: none;
 }
 
@@ -138,9 +139,13 @@ All colors MUST be HSL.
 }
 
 .react-flow__minimap {
-  background-color: hsl(var(--flow-node));
+  background-color: hsl(var(--flow-node)) !important;
   border: 1px solid hsl(var(--border));
-  border-radius: 0px;
+  border-radius: 10%;
+}
+
+.react-flow__minimap-svg {
+  border-radius: 10%;
 }
 
 .react-flow__controls {
@@ -195,10 +200,12 @@ All colors MUST be HSL.
 .react-flow__panel.react-flow__attribution.bottom.left {
   display: none;
 }
+
 /* Hide selection */
 .react-flow__nodesselection.react-flow__container.nopan {
   display: none;
 }
+
 /* Drag and Drop Styles */
 .dnd-dragging {
   opacity: 0.5;
@@ -213,11 +220,74 @@ All colors MUST be HSL.
 /* Box de seleção customizado */
 .react-flow__selection {
   position: absolute !important;
-  background: rgba(59, 130, 246, 0.10) !important; 
+  background: rgba(59, 130, 246, 0.10) !important;
   border: 1px solid #3b82f6 !important;
   box-shadow: 0 2px 12px 0 rgba(59, 130, 246, 0.10) !important;
   border-radius: 8px !important;
   z-index: 50 !important;
   pointer-events: none !important;
   transition: box-shadow 0.2s, border 0.2s, background 0.2s !important;
+}
+
+/* Group Node Drag & Drop Visual States */
+.view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* Espaçamento padrão entre elementos */
+  padding: 0rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.view-open {}
+
+/* Estado de hover para elementos filhos */
+.view:hover {
+  gap: 0.625rem;
+  /* Espaçamento intermediate no hover */
+}
+
+/* Elementos filhos com espaçamento melhorado */
+.view-child {
+  margin-bottom: 0.25rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.view-child:last-child {
+  margin-bottom: 0;
+}
+
+/* Estados especiais para dividers */
+.view-divider {
+  height: 3px;
+  background: transparent;
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0.125rem 0;
+}
+
+.view-divider.active {
+  height: 67px;
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.2);
+  margin: 8px 0px;
+}
+
+/* Animação de entrada para elementos */
+@keyframes viewSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-enter {
+  animation: viewSlideIn 0.3s ease-out;
 }

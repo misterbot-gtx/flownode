@@ -1,7 +1,7 @@
 # 📌 Lista de Melhorias e Atualizações
 
 
-## 1. 🔄 Melhorias na Lógica de Drag & Drop
+## 1. 🔄 Melhorias na Lógica de Drag & Drop - ✅ Feito
 
 - Ao arrastar um item da **sidebar**, ele **não deve ficar transparente** e sim como realmente tivesse tirado o elemento e nele o campo fique vazio.
 - O item arrastado deve ser visualmente **retirado da interface**, com um preview que **simule o elemento real**, como no Typebot.

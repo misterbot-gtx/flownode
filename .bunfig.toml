@@ -1,0 +1,2 @@
+[install]
+workspaces = ["packages/*", "packages/xyflow/*", "packages/xyflow/configs/@xyflow/*"]

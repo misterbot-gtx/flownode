@@ -7,7 +7,7 @@ export const FLOW_ELEMENTS: FlowElement[] = [
     type: 'textBubble',
     category: 'bubbles',
     label: 'Texto',
-    icon: '💬',
+    icon: '💭',
     description: 'Exibe uma mensagem de texto'
   },
   {

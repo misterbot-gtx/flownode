@@ -54,13 +54,14 @@ export function FlowBuilder() {
   };
 
   return (
-    <div className="flex h-screen bg-flow-canvas" onDrop={flow.onDrop} onDragOver={flow.onDragOver}>
+    <div className="flex h-screen bg-flow-canvas">
       <FlowSidebar />
       <div
         className="flex-1 relative"
         ref={containerRef}
         onWheel={handleWheel}
-        // Removido: handlers e visual de seleção manual
+        onDrop={flow.onDrop}
+        onDragOver={flow.onDragOver}
       >
         {/* Toolbar */}
         <div className="absolute top-4 left-4 z-10 flex gap-2">
@@ -81,7 +82,7 @@ export function FlowBuilder() {
           edgeTypes={flow.edgeTypes}
           onEdgeClick={flow.onEdgeClick}
           onInit={flow.onInit}
-          fitView={flow.fitView}
+          fitView={false}
           className="bg-flow-canvas"
           attributionPosition="bottom-left"
           connectionLineType={ConnectionLineType.SmoothStep}

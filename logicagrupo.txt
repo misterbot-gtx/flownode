@@ -1,0 +1,7 @@
+Eu quero que faça o seguite na logica de preview ao inves de manter a ideia atual de que ao passar em cima do proximo
+item mude para ele quero que faça o seguite quero que no item que mostra o preview matem o estádo final até que seja o mouse passe em cima
+do outro view-divider para evitar o problema de ficar em loop de abrir e fechar.Eu quero que faça o seguite na logica de preview ao inves de manter
+a ideia atual de que ao passar em cima do proximo item mude para ele quero que faça o seguite quero que no item que mostra o preview matem o estádo
+final até que seja o mouse passe em cima do outro view-divider para evitar o problema de ficar em loop de abrir e fechar.
+
+

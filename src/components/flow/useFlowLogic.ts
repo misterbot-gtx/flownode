@@ -154,20 +154,13 @@ export function useFlowLogic() {
           setNodeId((id) => id + 1);
         }
       } catch (error) {
-        // erro
+        console.error('Erro ao processar group drop:', error);
       }
       setPendingGroupDrop(null);
     }
   }, [pendingGroupDrop, nodes, nodeId, setNodes]);
 
-  useEffect(() => {
-    if (pendingGroupDrop) {
-      const timeout = setTimeout(() => {
-        setPendingGroupDrop(null);
-      }, 1000);
-      return () => clearTimeout(timeout);
-    }
-  }, [pendingGroupDrop]);
+  // Removido o timeout desnecessário que poderia interferir com o posicionamento
 
   const onConnect = useCallback(
     (params: Connection) => handleConnect(params, setEdges, nodes, edges),
@@ -192,6 +185,29 @@ export function useFlowLogic() {
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+    
+    // Debug: Log global de drag over
+    console.log('🌊 GLOBAL DRAG OVER:', {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      types: Array.from(event.dataTransfer.types || [])
+    });
+    
+    // Verifica se há dados sendo arrastados
+    const childNodeData = event.dataTransfer.getData('application/reactflow-child');
+    const elementData = event.dataTransfer.getData('application/reactflow');
+    
+    if (childNodeData) {
+      console.log('🔄 Nó filho sendo arrastado globalmente:', childNodeData);
+    }
+    if (elementData) {
+      try {
+        const element = JSON.parse(elementData);
+        console.log('📦 Elemento sendo arrastado globalmente:', element.label);
+      } catch (err) {
+        console.log('📦 Elemento sendo arrastado globalmente (dados inválidos)');
+      }
+    }
   }, []);
 
   const processDrop = useCallback((
@@ -202,6 +218,8 @@ export function useFlowLogic() {
     try {
       const element = JSON.parse(elementData) as FlowElement;
       let dropPosition;
+      
+      // Usa sempre o ReactFlow para converter coordenadas da tela para coordenadas do flow
       if (reactFlowRef.current) {
         const reactFlowInstance = reactFlowRef.current;
         const point = reactFlowInstance.screenToFlowPosition({
@@ -210,103 +228,96 @@ export function useFlowLogic() {
         });
         dropPosition = point;
       } else {
+        // Fallback se o ReactFlow não estiver disponível
         dropPosition = {
           x: event.clientX - reactFlowBounds.left,
           y: event.clientY - reactFlowBounds.top,
         };
       }
-      const groupNodes = nodes.filter(node => node.type === 'groupNode');
-      let targetGroup = null;
-      for (const node of groupNodes) {
-        const childNodes = nodes.filter(n => n.parentId === node.id);
-        const baseHeight = 160;
-        const childHeight = childNodes.length * 80;
-        const groupHeight = Math.max(baseHeight, childHeight);
-        const groupWidth = 320;
-        const tolerance = 10;
-        const isInsideGroup =
-          dropPosition.x >= (node.position.x - tolerance) &&
-          dropPosition.x <= (node.position.x + groupWidth + tolerance) &&
-          dropPosition.y >= (node.position.y - tolerance) &&
-          dropPosition.y <= (node.position.y + groupHeight + tolerance);
-        if (isInsideGroup) {
-          targetGroup = node;
-          break;
-        }
-      }
-      let finalPosition = dropPosition;
-      let parentId: string | undefined = undefined;
-      let nodeWidth: number | undefined = undefined;
-      let nodeHeight: number | undefined = undefined;
-      if (targetGroup) {
-        const offsetX = dropPosition.x - targetGroup.position.x;
-        const offsetY = dropPosition.y - targetGroup.position.y;
-        const headerHeight = 60;
-        const minY = Math.max(offsetY, headerHeight + 8);
-        finalPosition = {
-          x: targetGroup.position.x + offsetX,
-          y: targetGroup.position.y + minY,
-        };
-        parentId = targetGroup.id;
-      }
-      if (!targetGroup) {
-        const elementType = (element.type || '').toLowerCase();
-        const { width, height } = NODE_SIZES[elementType] || NODE_SIZES['default'];
-        finalPosition = {
-          x: dropPosition.x - width / 2,
-          y: dropPosition.y - height / 2,
-        };
-        nodeWidth = width;
-        nodeHeight = height;
-      }
+      
+      // SEMPRE criar um novo grupo para qualquer componente
+      const newGroup: Node = {
+        id: `group-${groupId}`,
+        type: 'groupNode',
+        position: { x: dropPosition.x - 150, y: dropPosition.y - 80 },
+        data: {
+          title: `${element.label} - Grupo`,
+          nodes: [],
+        },
+      };
+      
+      // Calcular posição do componente dentro do grupo
+      const elementType = (element.type || '').toLowerCase();
+      const { width, height } = NODE_SIZES[elementType] || NODE_SIZES['default'];
+      const componentPosition = {
+        x: newGroup.position.x + 16,
+        y: newGroup.position.y + 80,
+      };
+      
       const typeMap: Record<string, string> = {
         start: 'startNode',
         texto: 'textNode',
         imagem: 'imageNode',
         audio: 'audioNode',
       };
-      const elementType = (element.type || '').toLowerCase();
       const nodeType = typeMap[elementType] || 'textNode';
+      
       const newNode: Node = {
         id: `${element.type}-${nodeId}`,
         type: nodeType,
-        position: finalPosition,
+        position: componentPosition,
         data: {
           label: element.label,
           element,
-          width: typeof nodeWidth !== 'undefined' ? nodeWidth : undefined,
-          height: typeof nodeHeight !== 'undefined' ? nodeHeight : undefined,
+          width,
+          height,
           tempHeightZero: true,
         },
-        parentId: parentId,
+        parentId: newGroup.id,
       };
-      console.log('Novo elemento criado:', newNode);
+      
+      // Adicionar grupo e componente ao estado
       setNodes((nds) => {
-        const newNodes = nds.concat(newNode);
-        setTimeout(() => {
-          if (reactFlowRef.current) {
-            const viewport = reactFlowRef.current.getViewport();
-            reactFlowRef.current.setViewport(viewport);
-          }
-        }, 0);
+        const newNodes = [...nds, newGroup, newNode];
         return newNodes;
       });
+      
       setNodeId((id) => id + 1);
+      setGroupId((id) => id + 1);
+      
+      console.log('Grupo e componente criados:', { group: newGroup, component: newNode });
     } catch (error) {
-      // erro
+      console.error('Erro ao processar drop:', error);
     }
-  }, [nodeId, setNodes, nodes]);
+  }, [nodeId, groupId, setNodes, setNodeId, setGroupId]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
       const elementData = event.dataTransfer.getData('application/reactflow');
-      if (!elementData) return;
-      setTimeout(() => {
-        if (pendingGroupDrop) return;
+      const childNodeData = event.dataTransfer.getData('application/reactflow-child');
+      
+      console.log('🎯 DROP EVENT:', {
+        hasElementData: !!elementData,
+        hasChildNodeData: !!childNodeData,
+        elementLabel: elementData ? (() => {
+          try { return JSON.parse(elementData).label; } catch { return 'unknown'; }
+        })() : null,
+        childNodeId: childNodeData,
+        clientX: event.clientX,
+        clientY: event.clientY
+      });
+      
+      if (!elementData && !childNodeData) {
+        console.log('⚠️ Nenhum dado encontrado no drop');
+        return;
+      }
+      
+      // Processa o drop imediatamente sem setTimeout
+      if (!pendingGroupDrop) {
         processDrop(event, elementData, reactFlowBounds);
-      }, 50);
+      }
     },
     [nodeId, setNodes, nodes, pendingGroupDrop, processDrop]
   );
@@ -356,13 +367,25 @@ export function useFlowLogic() {
   const processedNodes = useMemo(() => {
     return visibleNodes.map(node => {
       if (node.type === 'groupNode') {
+        // Filtra nós filhos de forma estável
         const childNodes = nodes.filter(n => n.parentId === node.id);
+        
+        // Evita atualizar o data se não houve mudanças significativas nos filhos
+        const existingChildIds = (node.data as any)?.childNodesIds || [];
+        const newChildIds = childNodes.map(n => n.id).sort();
+        
+        // Compara apenas os IDs dos filhos para detectar mudanças
+        const hasChanged = existingChildIds.length !== newChildIds.length ||
+          existingChildIds.some((id: string, index: number) => id !== newChildIds[index]);
+        
         return {
           ...node,
-          data: {
+          data: hasChanged ? {
             ...node.data,
             childNodes,
-          },
+            childNodesIds: newChildIds,
+            _updateTimestamp: Date.now(),
+          } : node.data,
         };
       }
       return node;
@@ -397,13 +420,11 @@ export function useFlowLogic() {
     onInit: (instance: ReactFlowInstance) => {
       reactFlowRef.current = instance;
     },
-    fitView: true,
     nodeColor,
     onDrop,
     onDragOver,
     createGroup,
     onPaneClick: clearEdgeSelection,
     reactFlowRef, // exporta a ref
-    // Remover exportação dos handlers de box selection
   };
 } 

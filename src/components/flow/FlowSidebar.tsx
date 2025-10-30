@@ -25,11 +25,10 @@ const draggingStyle = `
     opacity: 1;
     border-radius: 8px;
     filter: none;
-    /* Começa sem rotação, depois anima para -6deg */
     transform: rotate(0deg);
     transition: box-shadow 0.2s, border 0.2s, transform 0.3s cubic-bezier(0.4,0,0.2,1);
     pointer-events: none;
-    user-select: none;
+    cursor: text !important;
     padding: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
@@ -250,7 +249,7 @@ interface FlowSidebarProps {
 
 export function FlowSidebar({ className }: FlowSidebarProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [draggingElementId, setDraggingElementId] = useState<string | null>(null); // <-- Adicionado
+  const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
 
   // Impede drop dentro do sidebar
   const handleSidebarDrop = (event: React.DragEvent) => {
@@ -260,7 +259,7 @@ export function FlowSidebar({ className }: FlowSidebarProps) {
 
   return (
     <div
-      className={`w-80 bg-flow-sidebar border-r border-border/20 flex flex-col ${className}`}
+      className={`w-80 bg-flow-sidebar select-none border-r border-border/20 flex flex-col ${className}`}
       onDrop={handleSidebarDrop}
     >
       {/* Header */}

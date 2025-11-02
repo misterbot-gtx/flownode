@@ -138,14 +138,18 @@ All colors MUST be HSL.
   background-color: hsl(var(--flow-canvas));
 }
 
+.react-flow__minimap-mask {
+  display: none !important;
+}
+
 .react-flow__minimap {
   background-color: hsl(var(--flow-node)) !important;
   border: 1px solid hsl(var(--border));
-  border-radius: 10%;
+  border-radius: 10px;
 }
 
 .react-flow__minimap-svg {
-  border-radius: 10%;
+  border-radius: 10px;
 }
 
 .react-flow__controls {
@@ -290,4 +294,72 @@ All colors MUST be HSL.
 
 .view-enter {
   animation: viewSlideIn 0.3s ease-out;
+}
+
+/* Feedback visual para elementos sendo arrastados para fora do grupo */
+.group-child-node.dragging-out {
+  opacity: 0.8;
+  transform: scale(1.02);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 0 2px hsl(var(--destructive) / 0.5);
+  border-color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.1);
+  z-index: 1000;
+  position: relative;
+}
+
+/* Efeito visual quando um elemento está sendo removido do grupo */
+.group-child-node.removing {
+  animation: removeFromGroup 0.3s ease-out;
+}
+
+@keyframes removeFromGroup {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(0.98) translateY(-2px);
+  }
+
+  100% {
+    opacity: 0.5;
+    transform: scale(0.95) translateY(-5px);
+  }
+}
+
+/* Indicador visual de que o elemento pode ser solto fora do grupo */
+.group-drag-out-indicator {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  background: hsl(var(--destructive));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  z-index: 1001;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }

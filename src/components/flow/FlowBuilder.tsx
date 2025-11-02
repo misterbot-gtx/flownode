@@ -78,6 +78,7 @@ export function FlowBuilder() {
           onNodesChange={flow.onNodesChange}
           onEdgesChange={flow.onEdgesChange}
           onConnect={flow.onConnect}
+          onNodeDragStart={flow.onNodeDragStart}
           nodeTypes={flow.nodeTypes}
           edgeTypes={flow.edgeTypes}
           onEdgeClick={flow.onEdgeClick}

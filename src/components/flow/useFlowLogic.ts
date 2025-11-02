@@ -74,11 +74,16 @@ export function useFlowLogic() {
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const [pendingGroupDrop, setPendingGroupDrop] = useState<{
     groupId: string;
-    elementData: string;
+    elementData?: string;
+    insertIndex?: number;
+    isRemoval?: boolean;
+    elementId?: string;
+    draggedElement?: Node;
+    dropPosition?: { x: number; y: number };
     position: { x: number; y: number };
   } | null>(null);
-
-  // Remover box selection state e handlers
+  
+  // REMOVIDO: Estados para handlers React Flow - funcionalidade já implementada via DOM
 
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -105,69 +110,154 @@ export function useFlowLogic() {
     const handleGroupDrop = (event: CustomEvent) => {
       setPendingGroupDrop(event.detail);
     };
+    const handleRemoveFromGroup = (event: CustomEvent) => {
+      setPendingGroupDrop({
+        ...event.detail,
+        isRemoval: true,
+      });
+    };
+    const handleSelectChildNode = (event: CustomEvent) => {
+      // Permitir seleção de elementos individuais dentro dos grupos
+      const { nodeId, node } = event.detail;
+      console.log('Selecionando elemento individual:', nodeId);
+      // Aqui poderíamos implementar lógica adicional de seleção se necessário
+    };
     window.addEventListener('groupDrop', handleGroupDrop as EventListener);
+    window.addEventListener('removeFromGroup', handleRemoveFromGroup as EventListener);
+    window.addEventListener('selectChildNode', handleSelectChildNode as EventListener);
     return () => {
       window.removeEventListener('groupDrop', handleGroupDrop as EventListener);
+      window.removeEventListener('removeFromGroup', handleRemoveFromGroup as EventListener);
+      window.removeEventListener('selectChildNode', handleSelectChildNode as EventListener);
     };
   }, []);
 
   useEffect(() => {
     if (pendingGroupDrop) {
       try {
-        const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
-        const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
-        if (targetGroup) {
-          const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
-          const childIndex = existingChildren.length;
-          const padding = 16;
-          const childWidth = 250;
-          const childHeight = 80;
-          const maxChildrenPerRow = 1;
-          const row = Math.floor(childIndex / maxChildrenPerRow);
-          const col = childIndex % maxChildrenPerRow;
-          const relativeX = padding + (col * (childWidth + 8));
-          const relativeY = 80 + (row * (childHeight + 8));
-          const finalPosition = {
-            x: targetGroup.position.x + relativeX,
-            y: targetGroup.position.y + relativeY,
-          };
-          // Corrigir o type do node
-          const typeMap: Record<string, string> = {
-            start: 'startNode',
-            texto: 'textNode',
-            imagem: 'imageNode',
-            audio: 'audioNode',
-          };
-          const elementType = (element.type || '').toLowerCase();
-          const nodeType = typeMap[elementType] || 'textNode';
-          const newNode: Node = {
-            id: `${element.type}-${nodeId}`,
-            type: nodeType,
-            position: finalPosition,
-            data: {
-              label: element.label,
-              element,
-            },
-            parentId: targetGroup.id,
-          };
-          setNodes((nds) => nds.concat(newNode));
-          setNodeId((id) => id + 1);
+        if (pendingGroupDrop.isRemoval && pendingGroupDrop.elementId && pendingGroupDrop.draggedElement) {
+          // Lógica de remoção do grupo
+          const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
+          if (targetGroup) {
+            const dropPosition = pendingGroupDrop.dropPosition || pendingGroupDrop.position;
+            
+            // Calcular posição para colocar o elemento fora do grupo
+            let finalPosition;
+            if (reactFlowRef.current) {
+              const reactFlowInstance = reactFlowRef.current;
+              const point = reactFlowInstance.screenToFlowPosition({
+                x: dropPosition.x,
+                y: dropPosition.y,
+              });
+              finalPosition = point;
+            } else {
+              finalPosition = dropPosition;
+            }
+            
+            // Remover parentId para tirar o elemento do grupo
+            const updatedElement = {
+              ...pendingGroupDrop.draggedElement,
+              parentId: undefined,
+              position: finalPosition,
+            };
+            
+            setNodes((nds) =>
+              nds.map(node =>
+                node.id === pendingGroupDrop.elementId ? updatedElement : node
+              )
+            );
+            
+            console.log(`✅ Elemento '${pendingGroupDrop.elementId}' removido do grupo '${targetGroup.id}'`);
+          }
+        } else if (pendingGroupDrop.elementData) {
+          // Lógica de adição ao grupo (mantém a lógica existente)
+          const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
+          const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
+          if (targetGroup) {
+            const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
+            const insertIndex = Math.max(0, Math.min(pendingGroupDrop.insertIndex || 0, existingChildren.length));
+            const padding = 16;
+            const childWidth = 250;
+            const childHeight = 80;
+            const maxChildrenPerRow = 1;
+            const row = Math.floor(insertIndex / maxChildrenPerRow);
+            const col = insertIndex % maxChildrenPerRow;
+            const relativeX = padding + (col * (childWidth + 8));
+            const relativeY = 80 + (row * (childHeight + 8));
+            const finalPosition = {
+              x: targetGroup.position.x + relativeX,
+              y: targetGroup.position.y + relativeY,
+            };
+            const typeMap: Record<string, string> = {
+              start: 'startNode',
+              texto: 'textNode',
+              imagem: 'imageNode',
+              audio: 'audioNode',
+            };
+            const elementType = (element.type || '').toLowerCase();
+            const nodeType = typeMap[elementType] || 'textNode';
+            const newNode: Node = {
+              id: `${element.type}-${nodeId}`,
+              type: nodeType,
+              position: finalPosition,
+              data: {
+                label: element.label,
+                element,
+              },
+              parentId: targetGroup.id,
+            };
+            
+            // Inserir o nó na posição correta e reorganizar os elementos existentes
+            setNodes((nds) => {
+              const groupChildren = nds.filter(n => n.parentId === targetGroup.id);
+              const otherNodes = nds.filter(n => n.parentId !== targetGroup.id);
+              
+              const newChildNodes = [...groupChildren];
+              newChildNodes.splice(insertIndex, 0, newNode);
+              
+              const reorganizedNodes = newChildNodes.map((childNode, index) => {
+                const maxChildrenPerRow = 1;
+                const row = Math.floor(index / maxChildrenPerRow);
+                const col = index % maxChildrenPerRow;
+                const relativeX = padding + (col * (childWidth + 8));
+                const relativeY = 80 + (row * (childHeight + 8));
+                const newPosition = {
+                  x: targetGroup.position.x + relativeX,
+                  y: targetGroup.position.y + relativeY,
+                };
+                
+                if (childNode.position.x !== newPosition.x || childNode.position.y !== newPosition.y) {
+                  return {
+                    ...childNode,
+                    position: newPosition,
+                  };
+                }
+                return childNode;
+              });
+              
+              return [...otherNodes, ...reorganizedNodes];
+            });
+            
+            setNodeId((id) => id + 1);
+            console.log(`✅ Elemento inserido na posição ${insertIndex} do grupo ${targetGroup.id}`);
+          }
         }
       } catch (error) {
         console.error('Erro ao processar group drop:', error);
       }
       setPendingGroupDrop(null);
     }
-  }, [pendingGroupDrop, nodes, nodeId, setNodes]);
-
-  // Removido o timeout desnecessário que poderia interferir com o posicionamento
+  }, [pendingGroupDrop, nodes, nodeId, setNodes, reactFlowRef]);
 
   const onConnect = useCallback(
     (params: Connection) => handleConnect(params, setEdges, nodes, edges),
     [setEdges, nodes, edges]
   );
 
-  // Substituir handleNodesChange por repasse direto do onNodesChange
+  // REMOVIDO: Handlers React Flow - funcionalidade já implementada via DOM no GroupNode.tsx
+  // A implementação DOM com stopPropagation() já funciona corretamente
+  // e não interfere com o sistema de drag do React Flow
+
   const handleNodesChange = useCallback(
     (changes: any[]) => {
       // Intercepta remoção do node 'start'
@@ -181,6 +271,37 @@ export function useFlowLogic() {
     },
     [onNodesChange]
   );
+
+  // Handler para desagrupamento automático quando arrasto começa
+  const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node.parentId) {
+      // Encontrar o nó pai (grupo)
+      const parentNode = nodes.find(n => n.id === node.parentId);
+      
+      if (parentNode) {
+        // Calcular posição absoluta: posição do grupo + posição relativa do filho
+        const absolutePosition = {
+          x: parentNode.position.x + node.position.x,
+          y: parentNode.position.y + node.position.y,
+        };
+
+        // Atualizar o nó removendo o parentId e definindo posição absoluta
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  parentId: undefined,
+                  position: absolutePosition,
+                }
+              : n
+          )
+        );
+
+        console.log(`🔗 Nó '${node.id}' desagrupado do grupo '${parentNode.id}' - Posição absoluta:`, absolutePosition);
+      }
+    }
+  }, [nodes, setNodes]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -241,7 +362,7 @@ export function useFlowLogic() {
         type: 'groupNode',
         position: { x: dropPosition.x - 150, y: dropPosition.y - 80 },
         data: {
-          title: `${element.label} - Grupo`,
+          title: `Grupo #${groupId}`,
           nodes: [],
         },
       };
@@ -344,9 +465,9 @@ export function useFlowLogic() {
     return (node: Node) => {
       switch (node.type) {
         case 'startNode':
-          return '#16a34a';
+          return '#2563eb';
         case 'groupNode':
-          return '#1a1a2e';
+          return '#641172';
         case 'flowNode':
           const element = (node.data as any)?.element;
           if (element?.category === 'bubbles') return '#16a34a';
@@ -367,12 +488,20 @@ export function useFlowLogic() {
   const processedNodes = useMemo(() => {
     return visibleNodes.map(node => {
       if (node.type === 'groupNode') {
-        // Filtra nós filhos de forma estável
-        const childNodes = nodes.filter(n => n.parentId === node.id);
+        // Filtra e ordena nós filhos pela posição (x, y) para manter a ordem correta
+        const childNodes = nodes
+          .filter(n => n.parentId === node.id)
+          .sort((a, b) => {
+            // Ordena primeiro por Y (linha), depois por X (coluna)
+            if (a.position.y !== b.position.y) {
+              return a.position.y - b.position.y;
+            }
+            return a.position.x - b.position.x;
+          });
         
         // Evita atualizar o data se não houve mudanças significativas nos filhos
         const existingChildIds = (node.data as any)?.childNodesIds || [];
-        const newChildIds = childNodes.map(n => n.id).sort();
+        const newChildIds = childNodes.map(n => n.id);
         
         // Compara apenas os IDs dos filhos para detectar mudanças
         const hasChanged = existingChildIds.length !== newChildIds.length ||
@@ -425,6 +554,9 @@ export function useFlowLogic() {
     onDragOver,
     createGroup,
     onPaneClick: clearEdgeSelection,
+    onNodeDragStart, // Handler para desagrupamento automático
     reactFlowRef, // exporta a ref
+    // Handlers para desaninhamento de nós filhos
+    // REMOVIDO: Handlers foram removidos, pois a funcionalidade já existe no GroupNode.tsx
   };
-} 
+}

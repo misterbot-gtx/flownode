@@ -58,6 +58,7 @@ export function FlowBuilder() {
       <FlowSidebar />
       <div
         className="flex-1 relative"
+        style={{ width: '100%', height: 'calc(100vh - 0px)' }}
         ref={containerRef}
         onWheel={handleWheel}
         onDrop={flow.onDrop}
@@ -90,6 +91,7 @@ export function FlowBuilder() {
           connectionLineStyle={{ stroke: '#9aa1cd', strokeWidth: 0.5, strokeDasharray: '7 5', animation: 'dashdraw 1s linear infinite' }}
           zoomOnScroll={false}
           multiSelectionKeyCode="Shift"
+          style={{ width: '100%', height: '100%', minHeight: '800px' }}
         >
           <Controls className="bg-flow-node border-none border-border/20 rounded-lg shadow-lg" position="top-right" />
           <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="bottom-right" />

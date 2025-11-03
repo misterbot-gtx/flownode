@@ -41,11 +41,9 @@ const GroupChildNode = memo(
         draggable
         onMouseEnter={() => {
           // Feedback visual quando passa o mouse em cima
-          console.log('🖱️ MouseEnter em elemento filho:', node.id);
         }}
         onMouseDown={(e) => {
           e.stopPropagation();
-          console.log('🖱️ MouseDown em elemento filho:', node.id);
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -60,7 +58,6 @@ const GroupChildNode = memo(
         }}
         onDragStart={(e) => {
           e.stopPropagation(); // CRÍTICO: parar propagação para evitar que o grupo seja arrastado
-          console.log('🔄 DragStart em elemento filho:', node.id);
           
           e.dataTransfer.setData('application/reactflow-child', node.id);
           e.dataTransfer.effectAllowed = 'move';
@@ -143,7 +140,6 @@ const GroupChildNode = memo(
         }}
         onDragEnd={(e) => {
           e.stopPropagation(); // CRÍTICO: parar propagação
-          console.log('🏁 DragEnd em elemento filho:', node.id);
           
           // Remover classes visuais e restaurar posição
           const element = e.currentTarget as HTMLElement;
@@ -243,21 +239,11 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
           e.clientY < rect.top ||
           e.clientY > rect.bottom;
         
-        console.log('🎯 DRAG MOVE - Posição do cursor:', {
-          cursor: { x: e.clientX, y: e.clientY },
-          groupRect: rect,
-          isOutside,
-          draggedChildId,
-          currentIsCursorOutside: isCursorOutside
-        });
-        
         if (isOutside !== isCursorOutside) {
           setIsCursorOutside(isOutside);
           
           // NOVO COMPORTAMENTO: Remover elemento automaticamente quando sai do grupo
           if (isOutside && !isCursorOutside) {
-            console.log('🗑️ REMOÇÃO AUTOMÁTICA: Cursor saiu do grupo, removendo elemento:', draggedChildId);
-            
             const draggedNode = localChildNodes.find((node) => node.id === draggedChildId);
             if (draggedNode) {
               // Disparar evento de remoção automática
@@ -297,7 +283,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     const handleNewDragStart = () => {
       if (isPreviewStable) {
         setIsPreviewStable(false);
-        console.log('🔄 PREVIEW ESTÁVEL RESETADO (novo drag detectado) no grupo:', title);
       }
     };
 
@@ -334,25 +319,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     if (!isPreviewStable) {
       setIsPreviewMode(true);
       setIsPreviewStable(true);
-      console.log('🔒 PREVIEW ESTABILIZADO para grupo:', title);
     }
-
-    // Log básico para debug - SEMPRE mostra
-    console.log('🎯 GROUPDRAGOVER:', title, 'isPreviewStable:', isPreviewStable, 'isPreviewMode:', isPreviewMode);
-
-    // Verificar tipos de dados disponíveis
-    const types = Array.from(e.dataTransfer.types || []);
-    console.log('📋 DataTransfer types:', types);
-
-    const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
-    const elementData = e.dataTransfer.getData('application/reactflow');
-
-    console.log('🔍 Debug info:', {
-      draggedNodeId,
-      elementData: !!elementData,
-      elementPreview: elementData ? elementData.substring(0, 50) + '...' : null,
-      localChildNodesCount: localChildNodes.length
-    });
 
     // LÓGICA MELHORADA: Zona de 20% de sensibilidade para mudança de posição
     const previousIndex = previousDragOverIndexRef.current;
@@ -387,34 +354,8 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
       // Garante que o índice está dentro dos limites válidos
       newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
 
-      console.log('🎯 SENSITIVITY DEBUG:', {
-        offsetY,
-        itemHeight,
-        baseIndex,
-        positionInItem,
-        sensitivityZone: sensitivityZone.toFixed(2),
-        newIndex,
-        previousIndex,
-        isPositionChange: newIndex !== previousIndex
-      });
-
       // Log quando a posição muda com informação da zona de sensibilidade
       if (newIndex !== previousIndex) {
-        const direction = newIndex < previousIndex ? 'para cima' : 'para baixo';
-        const zoneInfo = positionInItem < sensitivityZone ? '(zona superior - 20%)' :
-          positionInItem > itemHeight - sensitivityZone ? '(zona inferior - 20%)' : '(zona central)';
-
-        if (draggedNodeId) {
-          console.log(`🔄 Nó filho '${draggedNodeId}' mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-        } else if (elementData) {
-          try {
-            const element = JSON.parse(elementData);
-            console.log(`📦 Elemento '${element.label}' mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-          } catch (err) {
-            console.log(`📦 Elemento mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-          }
-        }
-
         previousDragOverIndexRef.current = newIndex;
       }
 
@@ -423,16 +364,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
       // Grupo vazio - sempre mostra preview na posição 0
       const previousIndex = previousDragOverIndexRef.current;
       if (previousIndex !== 0) {
-        if (draggedNodeId) {
-          console.log(`🔄 Nó filho '${draggedNodeId}' será posicionado no início do grupo '${title}' (grupo vazio)`);
-        } else if (elementData) {
-          try {
-            const element = JSON.parse(elementData);
-            console.log(`📦 Elemento '${element.label}' será posicionado no início do grupo '${title}' (grupo vazio)`);
-          } catch (err) {
-            console.log(`📦 Elemento será posicionado no início do grupo '${title}' (grupo vazio)`);
-          }
-        }
         previousDragOverIndexRef.current = 0;
       }
       setDragOverIndex(0);
@@ -454,33 +385,12 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         e.clientY < rect.top ||
         e.clientY > rect.bottom;
 
-      // Log quando sai do foco do grupo
-      if (isLeavingGroup && isDragOver) {
-        const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
-        const isChildNode = draggedNodeId !== '';
-
-        if (isChildNode) {
-          console.log(`❌ Nó filho '${draggedNodeId}' saiu do foco do grupo '${title}'`);
-        } else {
-          const elementData = e.dataTransfer.getData('application/reactflow');
-          if (elementData) {
-            try {
-              const element = JSON.parse(elementData);
-              console.log(`❌ Elemento '${element.label}' saiu do foco do grupo '${title}'`);
-            } catch (err) {
-              console.log(`❌ Elemento saiu do foco do grupo '${title}'`);
-            }
-          }
-        }
-      }
-
       // Só reseta os estados se realmente saiu do grupo
       if (isLeavingGroup) {
         setIsDragOver(false);
         setDragOverIndex(-1);
         setIsPreviewMode(false); // Desativa modo preview
         setIsPreviewStable(false); // Reseta preview estável
-        console.log('🔓 PREVIEW ESTÁVEL RESETADO para grupo:', title);
         previousDragOverIndexRef.current = -1; // Reset para próxima vez
       }
     } else {
@@ -501,7 +411,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     setIsDragOver(false);
     setIsPreviewMode(false); // Desativa modo preview
     setIsPreviewStable(false); // Reseta preview estável
-    console.log('🔓 PREVIEW ESTÁVEL RESETADO após DROP no grupo:', title);
     previousDragOverIndexRef.current = -1; // Reset para próxima vez
     
     const elementData = e.dataTransfer.getData('application/reactflow');
@@ -560,8 +469,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
           }
         } else {
           // Drop fora do grupo - remover elemento do grupo
-          console.log(`🗑️ Removendo elemento '${draggedNodeId}' do grupo '${title}'`);
-          
           const customEvent = new CustomEvent('removeFromGroup', {
             detail: {
               groupId: id,
@@ -640,7 +547,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
             <button
               onClick={() => {
                 // TODO: Implementar lógica de copiar grupo
-                console.log('Copiar grupo:', title);
               }}
               className="p-1 rounded-md hover:bg-flow-node-hover transition-colors"
             >
@@ -648,7 +554,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
             </button>
             <button
               onClick={() => {
-                console.log('Deletar grupo:', title);
+                // TODO: Implementar lógica de deletar grupo
               }}
               className="group p-1 rounded-md hover:bg-red-500/20 transition-colors"
             >

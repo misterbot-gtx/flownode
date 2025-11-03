@@ -119,7 +119,6 @@ export function useFlowLogic() {
     const handleSelectChildNode = (event: CustomEvent) => {
       // Permitir seleção de elementos individuais dentro dos grupos
       const { nodeId, node } = event.detail;
-      console.log('Selecionando elemento individual:', nodeId);
       // Aqui poderíamos implementar lógica adicional de seleção se necessário
     };
     window.addEventListener('groupDrop', handleGroupDrop as EventListener);
@@ -167,7 +166,6 @@ export function useFlowLogic() {
               )
             );
             
-            console.log(`✅ Elemento '${pendingGroupDrop.elementId}' removido do grupo '${targetGroup.id}'`);
           }
         } else if (pendingGroupDrop.elementData) {
           // Lógica de adição ao grupo (mantém a lógica existente)
@@ -176,6 +174,7 @@ export function useFlowLogic() {
           if (targetGroup) {
             const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
             const insertIndex = Math.max(0, Math.min(pendingGroupDrop.insertIndex || 0, existingChildren.length));
+            
             const padding = 16;
             const childWidth = 250;
             const childHeight = 80;
@@ -210,7 +209,7 @@ export function useFlowLogic() {
             // Inserir o nó na posição correta e reorganizar os elementos existentes
             setNodes((nds) => {
               const groupChildren = nds.filter(n => n.parentId === targetGroup.id);
-              const otherNodes = nds.filter(n => n.parentId !== targetGroup.id);
+              const otherNodes = nds.filter(n => n.parentId !== targetGroup.id && n.id !== targetGroup.id);
               
               const newChildNodes = [...groupChildren];
               newChildNodes.splice(insertIndex, 0, newNode);
@@ -226,20 +225,18 @@ export function useFlowLogic() {
                   y: targetGroup.position.y + relativeY,
                 };
                 
-                if (childNode.position.x !== newPosition.x || childNode.position.y !== newPosition.y) {
-                  return {
-                    ...childNode,
-                    position: newPosition,
-                  };
-                }
-                return childNode;
+                // Criar novo nó com posição atualizada
+                return {
+                  ...childNode,
+                  position: newPosition,
+                };
               });
               
-              return [...otherNodes, ...reorganizedNodes];
+              const result = [...otherNodes, targetGroup, ...reorganizedNodes];
+              return result;
             });
             
             setNodeId((id) => id + 1);
-            console.log(`✅ Elemento inserido na posição ${insertIndex} do grupo ${targetGroup.id}`);
           }
         }
       } catch (error) {
@@ -253,10 +250,6 @@ export function useFlowLogic() {
     (params: Connection) => handleConnect(params, setEdges, nodes, edges),
     [setEdges, nodes, edges]
   );
-
-  // REMOVIDO: Handlers React Flow - funcionalidade já implementada via DOM no GroupNode.tsx
-  // A implementação DOM com stopPropagation() já funciona corretamente
-  // e não interfere com o sistema de drag do React Flow
 
   const handleNodesChange = useCallback(
     (changes: any[]) => {
@@ -298,7 +291,6 @@ export function useFlowLogic() {
           )
         );
 
-        console.log(`🔗 Nó '${node.id}' desagrupado do grupo '${parentNode.id}' - Posição absoluta:`, absolutePosition);
       }
     }
   }, [nodes, setNodes]);
@@ -307,28 +299,9 @@ export function useFlowLogic() {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     
-    // Debug: Log global de drag over
-    console.log('🌊 GLOBAL DRAG OVER:', {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      types: Array.from(event.dataTransfer.types || [])
-    });
-    
     // Verifica se há dados sendo arrastados
     const childNodeData = event.dataTransfer.getData('application/reactflow-child');
     const elementData = event.dataTransfer.getData('application/reactflow');
-    
-    if (childNodeData) {
-      console.log('🔄 Nó filho sendo arrastado globalmente:', childNodeData);
-    }
-    if (elementData) {
-      try {
-        const element = JSON.parse(elementData);
-        console.log('📦 Elemento sendo arrastado globalmente:', element.label);
-      } catch (err) {
-        console.log('📦 Elemento sendo arrastado globalmente (dados inválidos)');
-      }
-    }
   }, []);
 
   const processDrop = useCallback((
@@ -406,9 +379,9 @@ export function useFlowLogic() {
       setNodeId((id) => id + 1);
       setGroupId((id) => id + 1);
       
-      console.log('Grupo e componente criados:', { group: newGroup, component: newNode });
     } catch (error) {
       console.error('Erro ao processar drop:', error);
+      throw error; // Re-throw para ser capturado pelo caller
     }
   }, [nodeId, groupId, setNodes, setNodeId, setGroupId]);
 
@@ -419,19 +392,7 @@ export function useFlowLogic() {
       const elementData = event.dataTransfer.getData('application/reactflow');
       const childNodeData = event.dataTransfer.getData('application/reactflow-child');
       
-      console.log('🎯 DROP EVENT:', {
-        hasElementData: !!elementData,
-        hasChildNodeData: !!childNodeData,
-        elementLabel: elementData ? (() => {
-          try { return JSON.parse(elementData).label; } catch { return 'unknown'; }
-        })() : null,
-        childNodeId: childNodeData,
-        clientX: event.clientX,
-        clientY: event.clientY
-      });
-      
       if (!elementData && !childNodeData) {
-        console.log('⚠️ Nenhum dado encontrado no drop');
         return;
       }
       
@@ -528,6 +489,139 @@ export function useFlowLogic() {
     }));
   }, [edges]);
 
+  // Função para exportar o flow
+  const exportFlow = useCallback(() => {
+    const flowData = {
+      nodes: processedNodes,
+      edges: processedEdges,
+      exportedAt: new Date().toISOString(),
+      version: '1.0.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(flowData, null, 2)], { 
+      type: 'application/json' 
+    });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `flow-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('✅ Flow exportado com sucesso:', flowData);
+  }, [processedNodes, processedEdges]);
+
+  // Função para importar o flow
+  const importFlow = useCallback((flowData: any) => {
+    try {
+      // Validar estrutura dos dados
+      if (!flowData.nodes || !flowData.edges) {
+        throw new Error('Estrutura de dados inválida:缺少 nodes ou edges');
+      }
+
+      // Mapear todos os nós e criar childNodes reais
+      const importedNodes: Node[] = [];
+      const groupNodesMap: Record<string, any> = {};
+      
+      // PASSO 1: Processar cada nó do export
+      flowData.nodes.forEach((exportNode: any) => {
+        // Verificar se é um nó startNode e garantir que tenha os dados corretos
+        if (exportNode.type === 'startNode') {
+          const startNode: Node = {
+            ...exportNode,
+            data: {
+              label: 'Início',
+              element: {
+                id: 'start',
+                type: 'start',
+                category: 'bubbles',
+                label: 'Início',
+                icon: '🚀',
+              },
+              ...exportNode.data
+            }
+          };
+          importedNodes.push(startNode);
+        } else if (exportNode.type === 'groupNode') {
+          // É um grupo - manter como está e guardar referência
+          importedNodes.push(exportNode);
+          groupNodesMap[exportNode.id] = exportNode;
+        } else {
+          // Outros nós individuais
+          importedNodes.push(exportNode);
+        }
+      });
+      
+      // PASSO 2: Processar childNodes dos grupos para criar nós reais
+      const additionalNodes: Node[] = [];
+      
+      Object.values(groupNodesMap).forEach((groupNode: any) => {
+        if (groupNode.data && groupNode.data.childNodes) {
+          groupNode.data.childNodes.forEach((childData: any, index: number) => {
+            // Mapear tipos corretamente
+            const typeMap: Record<string, string> = {
+              'textNode': 'textNode',
+              'imageNode': 'imageNode',
+              'audioNode': 'audioNode',
+              'startNode': 'startNode'
+            };
+            
+            const nodeType = typeMap[childData.type] || 'textNode';
+            
+            // Extrair dados do elemento
+            const element = childData.data?.element || childData.element;
+            
+            const realNode: Node = {
+              id: childData.id,
+              type: nodeType,
+              position: childData.position,
+              data: {
+                ...childData.data,
+                element: element,
+                label: childData.data?.label || element?.label || 'Elemento'
+              },
+              parentId: groupNode.id,
+              width: childData.width || 180,
+              height: childData.height || 80,
+              measured: childData.measured || { width: childData.width || 180, height: childData.height || 80 }
+            };
+            
+            additionalNodes.push(realNode);
+          });
+        }
+      });
+      
+      // PASSO 3: Combinar todos os nós
+      const finalNodes = [...importedNodes, ...additionalNodes];
+      
+      // PASSO 4: Verificar e preservar conexões
+      const finalEdges = flowData.edges.map((edge: any) => ({
+        ...edge,
+        type: 'custom', // Garantir que todas as edges usem o tipo custom
+        style: {
+          stroke: '#ffffff',
+          strokeWidth: 0.5,
+          strokeDasharray: '7 5',
+          animation: 'dashdraw 1s linear infinite',
+          cursor: 'pointer',
+          ...edge.style
+        }
+      }));
+      
+      // PASSO 5: Atualizar o estado
+      setNodes(() => finalNodes);
+      setEdges(() => finalEdges);
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao importar flow:', error);
+      return false;
+    }
+  }, [setNodes, setEdges]);
+
   return {
     nodes: processedNodes,
     edges: processedEdges,
@@ -558,5 +652,7 @@ export function useFlowLogic() {
     reactFlowRef, // exporta a ref
     // Handlers para desaninhamento de nós filhos
     // REMOVIDO: Handlers foram removidos, pois a funcionalidade já existe no GroupNode.tsx
+    exportFlow,
+    importFlow,
   };
 }

@@ -1,7 +1,0 @@
-packages:
-- 'react'
-- 'system'
-- 'packages/*'
-- 'examples/*'
-- 'tooling/*'
-- 'tests/*'

@@ -17,11 +17,25 @@ import { CustomEdge } from './CustomEdge';
 
 const NODE_SIZES: Record<string, { width: number; height: number }> = {
   'start': { width: 240, height: 60 },
+  'startNode': { width: 240, height: 60 },
   'imagem': { width: 180, height: 80 },
+  'imageNode': { width: 180, height: 80 },
   'audio': { width: 180, height: 80 },
+  'audioNode': { width: 180, height: 80 },
   'texto': { width: 180, height: 80 },
+  'textNode': { width: 180, height: 80 },
   'default': { width: 180, height: 80 },
 };
+
+// Constantes para layout dos grupos
+const GROUP_PADDING = 16; // Padding interno do grupo
+const HEADER_HEIGHT = 60; // Altura do header do grupo
+const CHILD_SPACING = 8; // Espaçamento entre filhos
+const CHILD_WIDTH = 180; // Largura padrão dos filhos
+const CHILD_HEIGHT = 80; // Altura padrão dos filhos
+const GROUP_DEFAULT_WIDTH = 280; // Largura padrão do grupo
+const GROUP_MIN_WIDTH = 280; // Largura mínima do grupo
+const GROUP_MIN_HEIGHT = 120; // Altura mínima do grupo
 
 const initialNodes: Node[] = [
   {
@@ -168,79 +182,19 @@ export function useFlowLogic() {
             
           }
         } else if (pendingGroupDrop.elementData) {
-          // Lógica de adição ao grupo (mantém a lógica existente)
+          // NOVA LÓGICA: Usar posicionamento automático
           const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
-          const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
-          if (targetGroup) {
-            const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
-            const insertIndex = Math.max(0, Math.min(pendingGroupDrop.insertIndex || 0, existingChildren.length));
-            
-            const padding = 16;
-            const childWidth = 250;
-            const childHeight = 80;
-            const maxChildrenPerRow = 1;
-            const row = Math.floor(insertIndex / maxChildrenPerRow);
-            const col = insertIndex % maxChildrenPerRow;
-            const relativeX = padding + (col * (childWidth + 8));
-            const relativeY = 80 + (row * (childHeight + 8));
-            const finalPosition = {
-              x: targetGroup.position.x + relativeX,
-              y: targetGroup.position.y + relativeY,
-            };
-            const typeMap: Record<string, string> = {
-              start: 'startNode',
-              texto: 'textNode',
-              imagem: 'imageNode',
-              audio: 'audioNode',
-            };
-            const elementType = (element.type || '').toLowerCase();
-            const nodeType = typeMap[elementType] || 'textNode';
-            const newNode: Node = {
-              id: `${element.type}-${nodeId}`,
-              type: nodeType,
-              position: finalPosition,
-              data: {
-                label: element.label,
-                element,
-              },
-              parentId: targetGroup.id,
-            };
-            
-            // Inserir o nó na posição correta e reorganizar os elementos existentes
-            setNodes((nds) => {
-              const groupChildren = nds.filter(n => n.parentId === targetGroup.id);
-              const otherNodes = nds.filter(n => n.parentId !== targetGroup.id && n.id !== targetGroup.id);
-              
-              const newChildNodes = [...groupChildren];
-              newChildNodes.splice(insertIndex, 0, newNode);
-              
-              const reorganizedNodes = newChildNodes.map((childNode, index) => {
-                const maxChildrenPerRow = 1;
-                const row = Math.floor(index / maxChildrenPerRow);
-                const col = index % maxChildrenPerRow;
-                const relativeX = padding + (col * (childWidth + 8));
-                const relativeY = 80 + (row * (childHeight + 8));
-                const newPosition = {
-                  x: targetGroup.position.x + relativeX,
-                  y: targetGroup.position.y + relativeY,
-                };
-                
-                // Criar novo nó com posição atualizada
-                return {
-                  ...childNode,
-                  position: newPosition,
-                };
-              });
-              
-              const result = [...otherNodes, targetGroup, ...reorganizedNodes];
-              return result;
-            });
-            
-            setNodeId((id) => id + 1);
-          }
+          
+          console.log('🎯 Adicionando elemento ao grupo com posicionamento automático:', element);
+          
+          addChildToGroup(
+            pendingGroupDrop.groupId,
+            element,
+            pendingGroupDrop.insertIndex
+          );
         }
       } catch (error) {
-        console.error('Erro ao processar group drop:', error);
+        console.error('❌ Erro ao processar group drop:', error);
       }
       setPendingGroupDrop(null);
     }
@@ -265,33 +219,13 @@ export function useFlowLogic() {
     [onNodesChange]
   );
 
-  // Handler para desagrupamento automático quando arrasto começa
+  // Handler para desagrupamento automático apenas quando nó sai do grupo
   const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
     if (node.parentId) {
-      // Encontrar o nó pai (grupo)
-      const parentNode = nodes.find(n => n.id === node.parentId);
-      
-      if (parentNode) {
-        // Calcular posição absoluta: posição do grupo + posição relativa do filho
-        const absolutePosition = {
-          x: parentNode.position.x + node.position.x,
-          y: parentNode.position.y + node.position.y,
-        };
-
-        // Atualizar o nó removendo o parentId e definindo posição absoluta
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === node.id
-              ? {
-                  ...n,
-                  parentId: undefined,
-                  position: absolutePosition,
-                }
-              : n
-          )
-        );
-
-      }
+      // O desagrupamento automático foi REMOVIDO
+      // Agora só acontece quando o elemento é explicitamente solto fora do grupo
+      // ou através do sistema de drag-and-drop próprio dos grupos
+      console.log('Nó iniciado com parentId:', node.id, 'grupo:', node.parentId);
     }
   }, [nodes, setNodes]);
 
@@ -368,6 +302,7 @@ export function useFlowLogic() {
           tempHeightZero: true,
         },
         parentId: newGroup.id,
+        extent: 'parent' as const,
       };
       
       // Adicionar grupo e componente ao estado
@@ -396,19 +331,243 @@ export function useFlowLogic() {
         return;
       }
       
-      // Processa o drop imediatamente sem setTimeout
+      // Verificar se há um grupo no ponto do drop
+      const dropPosition = {
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      };
+      
+      // Convertendo para coordenadas do flow para verificar se há um grupo
+      let finalDropPosition = dropPosition;
+      if (reactFlowRef.current) {
+        const reactFlowInstance = reactFlowRef.current;
+        finalDropPosition = reactFlowInstance.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+      }
+      
+      // Buscar grupo no ponto do drop
+      const groupAtDropPoint = nodes.find(node => {
+        if (node.type !== 'groupNode') return false;
+        
+        const nodeBounds = {
+          left: node.position.x,
+          top: node.position.y,
+          right: node.position.x + (node.width || 280),
+          bottom: node.position.y + (node.height || 120),
+        };
+        
+        return (
+          finalDropPosition.x >= nodeBounds.left &&
+          finalDropPosition.x <= nodeBounds.right &&
+          finalDropPosition.y >= nodeBounds.top &&
+          finalDropPosition.y <= nodeBounds.bottom
+        );
+      });
+      
+      // Processa o drop
       if (!pendingGroupDrop) {
-        processDrop(event, elementData, reactFlowBounds);
+        if (groupAtDropPoint && elementData) {
+          // Drop sobre grupo existente - usar lógica de groupDrop
+          const customEvent = new CustomEvent('groupDrop', {
+            detail: {
+              groupId: groupAtDropPoint.id,
+              elementData: elementData,
+              insertIndex: 0, // Será calculado pelo GroupNode
+              position: {
+                x: event.clientX,
+                y: event.clientY,
+              },
+            },
+          });
+          window.dispatchEvent(customEvent);
+        } else {
+          // Drop em área vazia - criar novo grupo
+          processDrop(event, elementData, reactFlowBounds);
+        }
       }
     },
     [nodeId, setNodes, nodes, pendingGroupDrop, processDrop]
   );
 
+  // ========== FUNÇÕES DE POSICIONAMENTO AUTOMÁTICO ==========
+  
+  /**
+   * Calcula a posição relativa de um filho dentro do grupo
+   * @param index Índice do filho no grupo
+   * @param totalChildren Total de filhos no grupo
+   * @returns Posição relativa (x, y) dentro do grupo
+   */
+  const calculateChildPosition = useCallback((index: number, totalChildren: number) => {
+    const padding = GROUP_PADDING;
+    const headerHeight = HEADER_HEIGHT;
+    
+    const x = padding; // Sempre alinhado à esquerda com padding
+    const y = headerHeight + (index * (CHILD_HEIGHT + CHILD_SPACING)) + padding;
+    
+    return { x, y };
+  }, []);
+
+  /**
+   * Calcula as dimensões recomendadas do grupo baseado no número de filhos
+   * @param childCount Número de filhos
+   * @returns Dimensões recomendadas (width, height)
+   */
+  const calculateGroupDimensions = useCallback((childCount: number) => {
+    const width = GROUP_DEFAULT_WIDTH;
+    const minHeight = GROUP_MIN_HEIGHT;
+    
+    // Altura mínima + altura dos filhos + espaçamentos + padding
+    const calculatedHeight = HEADER_HEIGHT +
+      (childCount * CHILD_HEIGHT) +
+      ((childCount - 1) * CHILD_SPACING) +
+      (GROUP_PADDING * 2);
+    
+    const height = Math.max(minHeight, calculatedHeight);
+    
+    return { width, height };
+  }, []);
+
+  /**
+   * Atualiza as posições de todos os filhos do grupo
+   * @param groupId ID do grupo
+   * @param childNodes Lista de nós filhos
+   */
+  const updateChildrenPositions = useCallback((groupId: string, childNodes: Node[]) => {
+    setNodes((nds) => {
+      const updatedNodes = [...nds];
+      
+      // Atualizar cada filho com nova posição relativa
+      childNodes.forEach((child, index) => {
+        const newPosition = calculateChildPosition(index, childNodes.length);
+        
+        const childIndex = updatedNodes.findIndex(n => n.id === child.id);
+        if (childIndex !== -1) {
+          updatedNodes[childIndex] = {
+            ...updatedNodes[childIndex],
+            position: newPosition,
+          };
+        }
+      });
+      
+      return updatedNodes;
+    });
+  }, [calculateChildPosition, setNodes]);
+
+  /**
+   * Redimensiona o grupo baseado no número de filhos
+   * @param groupId ID do grupo
+   * @param childNodes Lista de nós filhos
+   */
+  const resizeGroup = useCallback((groupId: string, childNodes: Node[]) => {
+    const newDimensions = calculateGroupDimensions(childNodes.length);
+    
+    setNodes((nds) => {
+      return nds.map(node => {
+        if (node.id === groupId) {
+          return {
+            ...node,
+            width: newDimensions.width,
+            height: newDimensions.height,
+          };
+        }
+        return node;
+      });
+    });
+  }, [calculateGroupDimensions, setNodes]);
+
+  /**
+   * Processa a reorganização de filhos em um grupo
+   * @param groupId ID do grupo
+   * @param newChildrenOrder Nova ordem dos filhos
+   */
+  const reorganizeGroupChildren = useCallback((groupId: string, newChildrenOrder: Node[]) => {
+    updateChildrenPositions(groupId, newChildrenOrder);
+    resizeGroup(groupId, newChildrenOrder);
+  }, [updateChildrenPositions, resizeGroup]);
+
+  /**
+   * Adiciona um novo filho ao grupo com posição automática
+   * @param groupId ID do grupo
+   * @param element Elemento a ser adicionado
+   * @param insertIndex Índice de inserção (opcional)
+   */
+  const addChildToGroup = useCallback((
+    groupId: string,
+    element: FlowElement,
+    insertIndex?: number
+  ) => {
+    // Buscar grupo atual
+    const targetGroup = nodes.find(n => n.id === groupId);
+    if (!targetGroup) return;
+
+    // Buscar filhos existentes
+    const existingChildren = nodes.filter(n => n.parentId === groupId);
+    const finalIndex = insertIndex !== undefined ?
+      Math.max(0, Math.min(insertIndex, existingChildren.length)) :
+      existingChildren.length;
+
+    // Calcular posição do novo filho
+    const childPosition = calculateChildPosition(finalIndex, existingChildren.length + 1);
+
+    // Mapear tipo do elemento
+    const typeMap: Record<string, string> = {
+      'start': 'startNode',
+      'texto': 'textNode',
+      'textBubble': 'textNode',
+      'imagem': 'imageNode',
+      'imageBubble': 'imageNode',
+      'audio': 'audioNode',
+      'audioBubble': 'audioNode',
+    };
+    const elementType = (element.type || '').toLowerCase();
+    const nodeType = typeMap[elementType] || 'textNode';
+
+    // Calcular dimensões do novo nó
+    const { width, height } = NODE_SIZES[elementType] || NODE_SIZES['default'];
+
+    // Criar novo nó com posicionamento relativo
+    const newNode: Node = {
+      id: `${element.type}-${nodeId}`,
+      type: nodeType,
+      position: childPosition, // Posição relativa ao grupo
+      data: {
+        label: element.label,
+        element,
+        width,
+        height,
+      },
+      parentId: targetGroup.id,
+      extent: 'parent' as const, // CRÍTICO: mantém posição relativa
+    };
+
+    // Adicionar o novo nó
+    setNodes((nds) => [...nds, newNode]);
+    
+    // Atualizar posições de todos os filhos
+    const newChildrenOrder = [...existingChildren];
+    newChildrenOrder.splice(finalIndex, 0, newNode);
+    
+    // Reorganizar e redimensionar
+    setTimeout(() => {
+      reorganizeGroupChildren(groupId, newChildrenOrder);
+    }, 0);
+    
+    setNodeId((id) => id + 1);
+
+    console.log(`✅ Novo filho adicionado ao grupo ${groupId}:`, newNode);
+  }, [nodes, calculateChildPosition, nodeId, reorganizeGroupChildren, setNodes, setNodeId]);
+
   const createGroup = useCallback(() => {
+    const emptyGroupDimensions = calculateGroupDimensions(0);
+    
     const newGroup: Node = {
       id: `group-${groupId}`,
       type: 'groupNode',
       position: { x: 200, y: 200 },
+      width: emptyGroupDimensions.width,
+      height: emptyGroupDimensions.height,
       data: {
         title: `Group #${groupId}`,
         nodes: [],
@@ -416,11 +575,12 @@ export function useFlowLogic() {
     };
     setNodes((nds) => {
       const newNodes = nds.concat(newGroup);
-      // Removido: ajuste automático da visualização (fitView)
       return newNodes;
     });
     setGroupId((id) => id + 1);
-  }, [groupId, setNodes]);
+    
+    console.log('✅ Novo grupo criado com dimensões automáticas:', emptyGroupDimensions);
+  }, [groupId, setNodes, calculateGroupDimensions]);
 
   const nodeColor = useMemo(() => {
     return (node: Node) => {
@@ -442,40 +602,24 @@ export function useFlowLogic() {
   }, []);
 
   const visibleNodes = useMemo(() => {
-    const filtered = nodes.filter(node => !node.parentId);
-    return filtered;
+    // CRÍTICO: NÃO filtrar nós com parentId - eles precisam ser renderizados dentro dos grupos
+    // Removida a filtragem para permitir que nós filhos sejam exibidos
+    return nodes;
   }, [nodes]);
 
   const processedNodes = useMemo(() => {
     return visibleNodes.map(node => {
       if (node.type === 'groupNode') {
-        // Filtra e ordena nós filhos pela posição (x, y) para manter a ordem correta
-        const childNodes = nodes
-          .filter(n => n.parentId === node.id)
-          .sort((a, b) => {
-            // Ordena primeiro por Y (linha), depois por X (coluna)
-            if (a.position.y !== b.position.y) {
-              return a.position.y - b.position.y;
-            }
-            return a.position.x - b.position.x;
-          });
-        
-        // Evita atualizar o data se não houve mudanças significativas nos filhos
-        const existingChildIds = (node.data as any)?.childNodesIds || [];
-        const newChildIds = childNodes.map(n => n.id);
-        
-        // Compara apenas os IDs dos filhos para detectar mudanças
-        const hasChanged = existingChildIds.length !== newChildIds.length ||
-          existingChildIds.some((id: string, index: number) => id !== newChildIds[index]);
-        
+        // Remove childNodes do data do grupo - todos os nós devem estar no array raiz
         return {
           ...node,
-          data: hasChanged ? {
+          data: {
             ...node.data,
-            childNodes,
-            childNodesIds: newChildIds,
-            _updateTimestamp: Date.now(),
-          } : node.data,
+            // Remove propriedades específicas de childNodes se existirem
+            childNodes: undefined,
+            childNodesIds: undefined,
+            _updateTimestamp: undefined,
+          },
         };
       }
       return node;
@@ -491,15 +635,16 @@ export function useFlowLogic() {
 
   // Função para exportar o flow
   const exportFlow = useCallback(() => {
+    // Exportar TODOS os nós (pais e filhos) no array raiz conforme React Flow
     const flowData = {
-      nodes: processedNodes,
+      nodes: nodes, // Usar todos os nós, não apenas processedNodes
       edges: processedEdges,
       exportedAt: new Date().toISOString(),
       version: '1.0.0'
     };
     
-    const blob = new Blob([JSON.stringify(flowData, null, 2)], { 
-      type: 'application/json' 
+    const blob = new Blob([JSON.stringify(flowData, null, 2)], {
+      type: 'application/json'
     });
     
     const url = URL.createObjectURL(blob);
@@ -512,7 +657,8 @@ export function useFlowLogic() {
     URL.revokeObjectURL(url);
     
     console.log('✅ Flow exportado com sucesso:', flowData);
-  }, [processedNodes, processedEdges]);
+    console.log('📊 Total de nós exportados:', nodes.length, '(incluindo', nodes.filter(n => n.parentId).length, 'nós filhos)');
+  }, [nodes, processedEdges]);
 
   // Função para importar o flow
   const importFlow = useCallback((flowData: any) => {
@@ -522,82 +668,49 @@ export function useFlowLogic() {
         throw new Error('Estrutura de dados inválida:缺少 nodes ou edges');
       }
 
-      // Mapear todos os nós e criar childNodes reais
-      const importedNodes: Node[] = [];
-      const groupNodesMap: Record<string, any> = {};
-      
-      // PASSO 1: Processar cada nó do export
-      flowData.nodes.forEach((exportNode: any) => {
-        // Verificar se é um nó startNode e garantir que tenha os dados corretos
+      // PASSO 1: Processar todos os nós do export
+      const importedNodes: Node[] = flowData.nodes.map((exportNode: any) => {
         if (exportNode.type === 'startNode') {
-          const startNode: Node = {
+          // Garantir que startNode tenha dados corretos
+          return {
             ...exportNode,
             data: {
               label: 'Início',
               element: {
                 id: 'start',
                 type: 'start',
-                category: 'bubbles',
+                category: 'bubbles' as const,
                 label: 'Início',
                 icon: '🚀',
               },
               ...exportNode.data
             }
           };
-          importedNodes.push(startNode);
         } else if (exportNode.type === 'groupNode') {
-          // É um grupo - manter como está e guardar referência
-          importedNodes.push(exportNode);
-          groupNodesMap[exportNode.id] = exportNode;
+          // Remover childNodes dos dados do grupo - todos os nós devem estar no array raiz
+          return {
+            ...exportNode,
+            data: {
+              ...exportNode.data,
+              // Remove propriedades de childNodes se existirem
+              childNodes: undefined,
+              childNodesIds: undefined,
+              _updateTimestamp: undefined,
+            },
+          };
         } else {
-          // Outros nós individuais
-          importedNodes.push(exportNode);
+          // Outros nós - garantir que tenha extent: 'parent' se tiver parentId
+          if (exportNode.parentId) {
+            return {
+              ...exportNode,
+              extent: 'parent' as const,
+            };
+          }
+          return exportNode;
         }
       });
-      
-      // PASSO 2: Processar childNodes dos grupos para criar nós reais
-      const additionalNodes: Node[] = [];
-      
-      Object.values(groupNodesMap).forEach((groupNode: any) => {
-        if (groupNode.data && groupNode.data.childNodes) {
-          groupNode.data.childNodes.forEach((childData: any, index: number) => {
-            // Mapear tipos corretamente
-            const typeMap: Record<string, string> = {
-              'textNode': 'textNode',
-              'imageNode': 'imageNode',
-              'audioNode': 'audioNode',
-              'startNode': 'startNode'
-            };
-            
-            const nodeType = typeMap[childData.type] || 'textNode';
-            
-            // Extrair dados do elemento
-            const element = childData.data?.element || childData.element;
-            
-            const realNode: Node = {
-              id: childData.id,
-              type: nodeType,
-              position: childData.position,
-              data: {
-                ...childData.data,
-                element: element,
-                label: childData.data?.label || element?.label || 'Elemento'
-              },
-              parentId: groupNode.id,
-              width: childData.width || 180,
-              height: childData.height || 80,
-              measured: childData.measured || { width: childData.width || 180, height: childData.height || 80 }
-            };
-            
-            additionalNodes.push(realNode);
-          });
-        }
-      });
-      
-      // PASSO 3: Combinar todos os nós
-      const finalNodes = [...importedNodes, ...additionalNodes];
-      
-      // PASSO 4: Verificar e preservar conexões
+
+      // PASSO 2: Verificar e preservar conexões
       const finalEdges = flowData.edges.map((edge: any) => ({
         ...edge,
         type: 'custom', // Garantir que todas as edges usem o tipo custom
@@ -610,11 +723,17 @@ export function useFlowLogic() {
           ...edge.style
         }
       }));
-      
-      // PASSO 5: Atualizar o estado
-      setNodes(() => finalNodes);
+
+      // PASSO 3: Atualizar o estado
+      setNodes(() => importedNodes);
       setEdges(() => finalEdges);
-      
+
+      console.log('✅ Flow importado com sucesso:', {
+        totalNodes: importedNodes.length,
+        childNodes: importedNodes.filter(n => n.parentId).length,
+        groupNodes: importedNodes.filter(n => n.type === 'groupNode').length,
+      });
+
       return true;
     } catch (error) {
       console.error('Erro ao importar flow:', error);
@@ -650,6 +769,13 @@ export function useFlowLogic() {
     onPaneClick: clearEdgeSelection,
     onNodeDragStart, // Handler para desagrupamento automático
     reactFlowRef, // exporta a ref
+    // 🔧 NOVOS: Funções de posicionamento automático para grupos
+    calculateChildPosition,
+    calculateGroupDimensions,
+    updateChildrenPositions,
+    resizeGroup,
+    reorganizeGroupChildren,
+    addChildToGroup,
     // Handlers para desaninhamento de nós filhos
     // REMOVIDO: Handlers foram removidos, pois a funcionalidade já existe no GroupNode.tsx
     exportFlow,

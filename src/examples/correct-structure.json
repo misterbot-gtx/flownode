@@ -1,0 +1,92 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startNode",
+      "position": { "x": 400, "y": 100 },
+      "width": 140,
+      "height": 60,
+      "data": {
+        "label": "Início",
+        "element": {
+          "id": "start",
+          "type": "start",
+          "category": "bubbles",
+          "label": "Início",
+          "icon": "🚀"
+        }
+      },
+      "measured": { "width": 140, "height": 60 }
+    },
+    {
+      "id": "group-1",
+      "type": "groupNode",
+      "position": { "x": 559, "y": 372 },
+      "width": 280,
+      "height": 401,
+      "data": {
+        "title": "Grupo #1"
+      },
+      "measured": { "width": 280, "height": 401 }
+    },
+    {
+      "id": "textBubble-3",
+      "type": "textNode",
+      "position": { "x": 575, "y": 452 },
+      "width": 180,
+      "height": 80,
+      "data": {
+        "label": "Texto",
+        "element": {
+          "id": "text-bubble",
+          "type": "textBubble",
+          "category": "bubbles",
+          "label": "Texto",
+          "icon": "💭",
+          "description": "Exibe uma mensagem de texto"
+        }
+      },
+      "parentId": "group-1",
+      "extent": "parent",
+      "measured": { "width": 180, "height": 80 }
+    },
+    {
+      "id": "imageBubble-2",
+      "type": "imageNode",
+      "position": { "x": 575, "y": 540 },
+      "width": 180,
+      "height": 80,
+      "data": {
+        "label": "Imagem",
+        "element": {
+          "id": "image-bubble",
+          "type": "imageBubble",
+          "category": "bubbles",
+          "label": "Imagem",
+          "icon": "🖼️",
+          "description": "Exibe uma imagem"
+        }
+      },
+      "parentId": "group-1",
+      "extent": "parent",
+      "measured": { "width": 180, "height": 80 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-group-1",
+      "source": "start",
+      "target": "group-1",
+      "type": "custom",
+      "style": {
+        "stroke": "#ffffff",
+        "strokeWidth": 0.5,
+        "strokeDasharray": "7 5",
+        "animation": "dashdraw 1s linear infinite",
+        "cursor": "pointer"
+      }
+    }
+  ],
+  "exportedAt": "2025-11-03T02:33:00.000Z",
+  "version": "1.0.0"
+}

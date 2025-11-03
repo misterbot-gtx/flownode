@@ -1,17 +1,13 @@
 import { memo, useState, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node, useReactFlow } from '@xyflow/react';
 import { Trash2, Plus, Copy } from 'lucide-react';
 
 interface GroupNodeData {
   title: string;
-  nodes: string[];
-  childNodes?: Node[];
   isEditing?: boolean;
 }
 
-interface GroupNodeProps extends NodeProps {
-  childNodes?: Node[];
-}
+interface GroupNodeProps extends NodeProps {}
 
 // Componente para renderizar nós filhos com suporte a drag-over/drop
 const GroupChildNode = memo(
@@ -182,6 +178,7 @@ const GroupChildNode = memo(
 );
 
 export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
+  const reactFlow = useReactFlow();
   const [isHovered, setIsHovered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState(-1);
@@ -192,27 +189,39 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const groupData = data as unknown as GroupNodeData;
   const [isEditing, setIsEditing] = useState(groupData.isEditing || false);
   const [title, setTitle] = useState(groupData.title || 'Group #1');
-  const [localChildNodes, setLocalChildNodes] = useState<Node[]>(groupData.childNodes || []);
+  const [localChildNodes, setLocalChildNodes] = useState<Node[]>([]);
   const dragRef = useRef<HTMLDivElement>(null);
   const [draggedChildId, setDraggedChildId] = useState<string | null>(null);
   const previousDragOverIndexRef = useRef<number>(-1); // Para comparar índices
   const groupContainerRef = useRef<HTMLDivElement>(null); // ref para o container do grupo
   
   // Usar ref para armazenar o timestamp da última atualização
-  const lastUpdateRef = useRef<number>((groupData as any)._updateTimestamp || 0);
+  const lastUpdateRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    // Só atualiza se houver mudanças reais nos filhos e não estiver em modo de preview
-    if (!isPreviewMode && groupData.childNodes) {
-      const currentTimestamp = (groupData as any)._updateTimestamp || 0;
+    // Buscar nós filhos do React Flow baseado no parentId
+    const updateChildNodes = () => {
+      try {
+        const allNodes = reactFlow.getNodes();
+        const childNodes = allNodes
+          .filter(node => node.parentId === id)
+          .sort((a, b) => {
+            // Ordena primeiro por Y (linha), depois por X (coluna)
+            if (a.position.y !== b.position.y) {
+              return a.position.y - b.position.y;
+            }
+            return a.position.x - b.position.x;
+          });
 
-      // Evita atualizações desnecessárias se não houve mudanças significativas
-      if (currentTimestamp > lastUpdateRef.current) {
-        setLocalChildNodes(groupData.childNodes);
-        lastUpdateRef.current = currentTimestamp;
+        setLocalChildNodes(childNodes);
+        lastUpdateRef.current = Date.now();
+      } catch (error) {
+        console.warn('Erro ao buscar nós filhos:', error);
       }
-    }
-  }, [groupData.childNodes, (groupData as any)._updateTimestamp, isPreviewMode]);
+    };
+
+    updateChildNodes();
+  }, [id, reactFlow, isPreviewMode]);
 
   useEffect(() => {
     // Escuta global para detectar drag em andamento
@@ -445,24 +454,20 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
           e.clientY <= rect.bottom;
         
         if (isInsideGroup) {
-          // Drop dentro do grupo - reorganizar elementos
+          // Drop dentro do grupo - reorganizar elementos com posicionamento automático
           const updatedNodes = [...localChildNodes];
           const draggedIndex = updatedNodes.findIndex((node) => node.id === draggedNodeId);
           if (draggedIndex !== -1) {
             updatedNodes.splice(draggedIndex, 1);
-            updatedNodes.splice(dragOverIndex >= 0 ? dragOverIndex : localChildNodes.length, 0, draggedNode);
+            const newIndex = dragOverIndex >= 0 ? dragOverIndex : localChildNodes.length;
+            updatedNodes.splice(newIndex, 0, draggedNode);
             setLocalChildNodes(updatedNodes);
 
-            const customEvent = new CustomEvent('childNodeDrop', {
+            // Disparar evento para recalcular posições usando as novas funções
+            const customEvent = new CustomEvent('reorganizeGroupChildren', {
               detail: {
                 groupId: id,
-                targetIndex: dragOverIndex >= 0 ? dragOverIndex : localChildNodes.length,
-                elementId: draggedNodeId,
-                updatedNodes: updatedNodes,
-                position: {
-                  x: e.clientX,
-                  y: e.clientY,
-                },
+                newChildrenOrder: updatedNodes,
               },
             });
             window.dispatchEvent(customEvent);

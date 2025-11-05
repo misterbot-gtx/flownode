@@ -10,6 +10,8 @@ import '@xyflow/react/dist/style.css';
 
 import { FlowSidebar } from './FlowSidebar';
 import { useFlowLogic } from './useFlowLogic';
+import { DebugPanel } from './DebugPanel';
+import { PerformanceMonitor } from './PerformanceMonitor';
 import React, { useRef, useState } from 'react';
 
 export function FlowBuilder() {
@@ -78,7 +80,6 @@ export function FlowBuilder() {
           onNodesChange={flow.onNodesChange}
           onEdgesChange={flow.onEdgesChange}
           onConnect={flow.onConnect}
-          onNodeDragStart={flow.onNodeDragStart}
           nodeTypes={flow.nodeTypes}
           edgeTypes={flow.edgeTypes}
           onEdgeClick={flow.onEdgeClick}
@@ -95,6 +96,30 @@ export function FlowBuilder() {
           <MiniMap nodeColor={flow.nodeColor} className="bg-flow-node border border-border/20 rounded-lg shadow-lg" position="bottom-right" />
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#374151" />
         </ReactFlow>
+        
+        {/* Debug Panel */}
+        <DebugPanel
+          nodes={flow.nodes}
+          edges={flow.edges}
+          debugLogs={flow.debugLogs}
+          onAddDebugLog={flow.addDebugLog}
+          onClearLogs={() => {
+            // Add clear logs functionality if needed
+            console.log('🗑️ Logs cleared from debug panel');
+          }}
+        />
+
+        {/* Performance Monitor */}
+        <PerformanceMonitor
+          nodes={flow.nodes}
+          edges={flow.edges}
+          onPerformanceUpdate={(metrics) => {
+            // Log performance warnings
+            if (metrics.renderTime > 33) {
+              flow.addDebugLog('warning', 'Performance degradation detected', metrics);
+            }
+          }}
+        />
       </div>
     </div>
   );

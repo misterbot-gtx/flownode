@@ -1,8 +1,0 @@
-# Fechado
-
-<div role="button" class="css-1r2g7mx"><div class="css-1w5w25t"></div></div>
-
-
-# Aberto
-
-<div role="button" class="css-1kygc5g"><div class="css-whwiwb"></div></div>

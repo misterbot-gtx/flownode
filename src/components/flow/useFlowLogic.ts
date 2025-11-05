@@ -134,20 +134,28 @@ export function useFlowLogic() {
         const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
         const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
         if (targetGroup) {
-          const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
-          const childIndex = existingChildren.length;
-          const padding = 16;
-          const childWidth = 250;
-          const childHeight = 80;
-          const maxChildrenPerRow = 1;
-          const row = Math.floor(childIndex / maxChildrenPerRow);
-          const col = childIndex % maxChildrenPerRow;
-          const relativeX = padding + (col * (childWidth + 8));
-          const relativeY = 80 + (row * (childHeight + 8));
+          // USAR DADOS CONSISTENTES DO PREVIEW
+          const calculatedPosition = (pendingGroupDrop as any).calculatedPosition;
+          const dropIndex = (pendingGroupDrop as any).dropIndex || 0;
+          
+          console.log('🎯 PROCESSANDO GROUP DROP COM DADOS CONSISTENTES:', {
+            calculatedPosition,
+            dropIndex,
+            targetGroupPosition: targetGroup.position
+          });
+          
+          // POSIÇÃO FINAL: grupo position + calculatedPosition (sem conversões)
           const finalPosition = {
-            x: targetGroup.position.x + relativeX,
-            y: targetGroup.position.y + relativeY,
+            x: targetGroup.position.x + calculatedPosition.x,
+            y: targetGroup.position.y + calculatedPosition.y,
           };
+          
+          console.log('🎯 POSIÇÃO FINAL CALCULADA:', {
+            groupPosition: targetGroup.position,
+            calculatedPosition,
+            finalPosition
+          });
+          
           // Corrigir o type do node
           const typeMap: Record<string, string> = {
             start: 'startNode',
@@ -157,6 +165,10 @@ export function useFlowLogic() {
           };
           const elementType = (element.type || '').toLowerCase();
           const nodeType = typeMap[elementType] || 'textNode';
+          
+          // Obter dimensões do elemento
+          const elementDimensions = NODE_SIZES[elementType] || NODE_SIZES['default'];
+          
           const newNode: Node = {
             id: `${element.type}-${nodeId}`,
             type: nodeType,
@@ -164,16 +176,53 @@ export function useFlowLogic() {
             data: {
               label: element.label,
               element,
+              width: elementDimensions.width,
+              height: elementDimensions.height,
+              // MARCAR COMO CHILD DO GRUPO
+              parentGroupId: targetGroup.id,
             },
             parentId: targetGroup.id,
           };
-          setNodes((nds) => nds.concat(newNode));
-          setNodeId((id) => id + 1);
-          addDebugLog('success', 'Node adicionado ao grupo', {
-            nodeId: newNode.id,
-            type: newNode.type,
-            groupId: targetGroup.id
+          
+          setNodes((nds) => {
+            // INSERIR NA ORDEM CORRETA NO GRUPO
+            const newNodes = [...nds];
+            const groupChildNodes = newNodes.filter(n => n.parentId === targetGroup.id);
+            
+            // INSERIR O NOVO NÓ NA POSIÇÃO CORRETA
+            if (dropIndex >= groupChildNodes.length) {
+              // Inserir no final
+              newNodes.push(newNode);
+            } else {
+              // Encontrar onde inserir baseado no dropIndex
+              const nonGroupNodes = newNodes.filter(n => !n.parentId || n.parentId !== targetGroup.id);
+              const childrenToInsert = [...groupChildNodes];
+              childrenToInsert.splice(dropIndex, 0, newNode);
+              
+              // Recompor a lista mantendo a ordem: nós não-filhos + filhos do grupo na ordem correta
+              const finalNodes = [
+                ...nonGroupNodes,
+                ...childrenToInsert
+              ];
+              
+              addDebugLog('success', `🎯 COMPONENTE INSERIDO NA POSIÇÃO DO PREVIEW!`, {
+                nodeId: newNode.id,
+                type: newNode.type,
+                groupId: targetGroup.id,
+                position: finalPosition,
+                elementLabel: element.label,
+                dropIndex: dropIndex,
+                method: 'calculated-position-consistent',
+                finalPosition
+              });
+              
+              return finalNodes;
+            }
+            
+            return newNodes;
           });
+          
+          setNodeId((id) => id + 1);
         }
       } catch (error) {
         console.error('Erro ao processar group drop:', error);
@@ -342,8 +391,8 @@ export function useFlowLogic() {
         return;
       }
       
-      // Processa o drop imediatamente sem setTimeout
-      if (!pendingGroupDrop) {
+      // Só processa drops globais se não há pendência de grupo
+      if (!pendingGroupDrop && !childNodeData) {
         processDrop(event, elementData, reactFlowBounds);
       }
     },

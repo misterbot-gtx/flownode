@@ -74,6 +74,8 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const dragRef = useRef<HTMLDivElement>(null);
   const [draggedChildId, setDraggedChildId] = useState<string | null>(null);
   const previousDragOverIndexRef = useRef<number>(-1); // Para comparar índices
+  // NOVO: Armazenar a calculatedPosition para posicionamento exato
+  const [calculatedPosition, setCalculatedPosition] = useState<{x: number, y: number} | null>(null);
   
   // Usar ref para armazenar o timestamp da última atualização
   const lastUpdateRef = useRef<number>((groupData as any)._updateTimestamp || 0);
@@ -158,109 +160,45 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
       console.log('🔒 PREVIEW ESTABILIZADO para grupo:', title);
     }
     
-    // Log básico para debug - SEMPRE mostra
-    console.log('🎯 GROUPDRAGOVER:', title, 'isPreviewStable:', isPreviewStable, 'isPreviewMode:', isPreviewMode);
-    
-    // Verificar tipos de dados disponíveis
-    const types = Array.from(e.dataTransfer.types || []);
-    console.log('📋 DataTransfer types:', types);
-    
     const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
     const elementData = e.dataTransfer.getData('application/reactflow');
     
-    console.log('🔍 Debug info:', {
-      draggedNodeId,
-      elementData: !!elementData,
-      elementPreview: elementData ? elementData.substring(0, 50) + '...' : null,
-      localChildNodesCount: localChildNodes.length
-    });
+    // Calcular a posição exata do preview (calculatedPosition)
+    const groupRect = e.currentTarget.getBoundingClientRect();
+    const mouseXInGroup = e.clientX - groupRect.left;
+    const mouseYInGroup = e.clientY - groupRect.top;
     
-    // LÓGICA MELHORADA: Zona de 20% de sensibilidade para mudança de posição
-    const previousIndex = previousDragOverIndexRef.current;
-    const rect = dragRef.current?.getBoundingClientRect();
+    // Calcular posição considerando header e padding
+    const previewPosition = {
+      x: Math.max(16, Math.min(mouseXInGroup, groupRect.width - 180)),
+      y: Math.max(80, Math.min(mouseYInGroup, groupRect.height - 80))
+    };
     
-    if (rect && localChildNodes.length > 0) {
-      const offsetY = e.clientY - rect.top;
-      const totalHeight = rect.height;
-      const itemHeight = totalHeight / localChildNodes.length;
-      
-      // Calcula a posição base (centro de cada item)
-      const baseIndex = Math.floor(offsetY / itemHeight);
-      
-      // Verificar se é especificamente o último componente no grupo (último índice)
-      const isLastComponent = localChildNodes.length > 0 && baseIndex === localChildNodes.length - 1;
-      
-      // Define a zona de sensibilidade: 25% apenas para último componente, 5% para outros (muito restritivo)
-      const sensitivityZone = itemHeight * (isLastComponent ? 0.25 : 0.05);
-      const positionInItem = offsetY % itemHeight;
-      
-      // Determina se está na zona de sensibilidade para mudar de posição
-      let newIndex = baseIndex;
-      
-      if (positionInItem < sensitivityZone) {
-        // Está na zona de sensibilidade - pode ser para o item anterior
-        newIndex = Math.max(0, baseIndex - 1);
-      } else if (positionInItem > itemHeight - sensitivityZone) {
-        // Está na zona de sensibilidade - pode ser para o próximo item
-        newIndex = Math.min(localChildNodes.length, baseIndex + 1);
-      }
-      
-      // Garante que o índice está dentro dos limites válidos
-      newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
-      
-      console.log('🎯 SENSITIVITY DEBUG:', {
-        offsetY,
-        itemHeight,
-        baseIndex,
-        positionInItem,
-        sensitivityZone: sensitivityZone.toFixed(2),
-        newIndex,
-        previousIndex,
-        isPositionChange: newIndex !== previousIndex
-      });
-      
-      // Log quando a posição muda com informação da zona de sensibilidade
-      if (newIndex !== previousIndex) {
-        const direction = newIndex < previousIndex ? 'para cima' : 'para baixo';
-        const zoneInfo = positionInItem < sensitivityZone ? '(zona superior - 20%)' :
-                        positionInItem > itemHeight - sensitivityZone ? '(zona inferior - 20%)' : '(zona central)';
-        
-        if (draggedNodeId) {
-          console.log(`🔄 Nó filho '${draggedNodeId}' mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-        } else if (elementData) {
-          try {
-            const element = JSON.parse(elementData);
-            console.log(`📦 Elemento '${element.label}' mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-          } catch (err) {
-            console.log(`📦 Elemento mudou posição ${direction} ${zoneInfo} no grupo '${title}' (índice: ${previousIndex} → ${newIndex})`);
-          }
-        }
-        
-        previousDragOverIndexRef.current = newIndex;
-      }
-      
-      setDragOverIndex(newIndex);
-    } else if (rect && localChildNodes.length === 0) {
-      // Grupo vazio - sempre mostra preview na posição 0
-      const previousIndex = previousDragOverIndexRef.current;
-      if (previousIndex !== 0) {
-        if (draggedNodeId) {
-          console.log(`🔄 Nó filho '${draggedNodeId}' será posicionado no início do grupo '${title}' (grupo vazio)`);
-        } else if (elementData) {
-          try {
-            const element = JSON.parse(elementData);
-            console.log(`📦 Elemento '${element.label}' será posicionado no início do grupo '${title}' (grupo vazio)`);
-          } catch (err) {
-            console.log(`📦 Elemento será posicionado no início do grupo '${title}' (grupo vazio)`);
-          }
-        }
-        previousDragOverIndexRef.current = 0;
-      }
-      setDragOverIndex(0);
-    } else {
-      // Fallback - não há referência ou grupo vazio
-      setDragOverIndex(0);
+    // Atualizar calculatedPosition se mudou significativamente
+    const currentPos = calculatedPosition;
+    if (!currentPos ||
+        Math.abs(currentPos.x - previewPosition.x) > 5 ||
+        Math.abs(currentPos.y - previewPosition.y) > 5) {
+      setCalculatedPosition(previewPosition);
+      console.log('🎯 CALCULATED POSITION ATUALIZADA:', previewPosition);
     }
+    
+    // Calcular índice de drop baseado na posição Y
+    let newIndex = 0;
+    if (localChildNodes.length > 0) {
+      const offsetY = e.clientY - groupRect.top;
+      const itemHeight = 88; // altura padrão dos componentes
+      newIndex = Math.floor((offsetY - 80) / itemHeight);
+      newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
+    }
+    
+    // Atualizar dragOverIndex se mudou
+    if (newIndex !== previousDragOverIndexRef.current) {
+      console.log(`🎯 DropIndex alterado: ${previousDragOverIndexRef.current} → ${newIndex}`);
+      previousDragOverIndexRef.current = newIndex;
+    }
+    
+    setDragOverIndex(newIndex);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -318,27 +256,53 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // RESET COMPLETO DOS ESTADOS DE PREVIEW
+    // RESET DOS ESTADOS DE PREVIEW
     setIsDragOver(false);
-    setIsPreviewMode(false); // Desativa modo preview
-    setIsPreviewStable(false); // Reseta preview estável
+    setIsPreviewMode(false);
+    setIsPreviewStable(false);
     console.log('🔓 PREVIEW ESTÁVEL RESETADO após DROP no grupo:', title);
-    previousDragOverIndexRef.current = -1; // Reset para próxima vez
+    previousDragOverIndexRef.current = -1;
     
     const elementData = e.dataTransfer.getData('application/reactflow');
     if (elementData) {
+      // USAR AS COORDENADAS JÁ CALCULADAS DURANTE O PREVIEW
+      const finalDropIndex = dragOverIndex >= 0 ? dragOverIndex : 0;
+      
+      // Usar calculatedPosition direta, sem re-calcular
+      const finalPosition = calculatedPosition || { x: 16, y: 120 }; // fallback
+      
+      console.log('🎯 DROP USANDO CALCULATED POSITION:', {
+        calculatedPosition: finalPosition,
+        dropIndex: finalDropIndex,
+        isConsistent: true
+      });
+      
+      // Dispara evento com dados consistentes do preview
       const customEvent = new CustomEvent('groupDrop', {
         detail: {
           groupId: id,
           elementData: elementData,
-          position: {
-            x: e.clientX,
-            y: e.clientY,
-          },
+          // USAR calculatedPosition como posição final
+          calculatedPosition: finalPosition,
+          dropIndex: finalDropIndex,
+          // Mantém dados originais para compatibilidade
+          mouseRelativePosition: finalPosition,
+          debug: {
+            groupTitle: title,
+            timestamp: Date.now(),
+            method: 'calculated-position-consistent'
+          }
         },
       });
       window.dispatchEvent(customEvent);
+      
+      console.log('✅ Evento groupDrop com posição consistente:', {
+        groupId: id,
+        finalPosition,
+        dropIndex: finalDropIndex
+      });
     }
+    
     // Se for um nó filho sendo movido dentro do grupo
     const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
     if (draggedNodeId) {
@@ -367,6 +331,9 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         }
       }
     }
+    
+    // Reset calculatedPosition após drop
+    setCalculatedPosition(null);
     setDragOverIndex(-1);
   };
 

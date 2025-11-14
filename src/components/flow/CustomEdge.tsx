@@ -4,7 +4,7 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   useReactFlow,
-} from '@xyflow/react';
+} from '@flow/react';
 import { X } from 'lucide-react';
 
 interface CustomEdgeProps {

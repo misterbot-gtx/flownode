@@ -1,0 +1,11 @@
+packages:
+- "packages/*"
+- "packages/*/*"
+- "packages/*/tooling/*"
+
+overrides:
+  "@flow/react": "link:packages/flow/react"
+  "@flow/system": "link:packages/flow/system"
+  "@flow/eslint-config": "link:packages/flow/tooling/eslint-config"
+  "@flow/rollup-config": "link:packages/flow/tooling/rollup-config"
+  "@flow/tsconfig": "link:packages/flow/tooling/tsconfig"

@@ -6,8 +6,8 @@ import {
   Edge,
   Node,
   ReactFlowInstance,
-} from '@xyflow/react';
-import { FlowElement } from '@/types/flow';
+} from '@flow/react';
+import { FlowElement } from '../../types/flow';
 import StartNode from './nodes/StartNode';
 import TextNode from './nodes/TextNode';
 import ImageNode from './nodes/ImageNode';
@@ -72,20 +72,36 @@ export function useFlowLogic() {
   const [nodeId, setNodeId] = useState(1);
   const [groupId, setGroupId] = useState(1);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const [debugLogs, setDebugLogs] = useState<any[]>([]);
   const [pendingGroupDrop, setPendingGroupDrop] = useState<{
     groupId: string;
-    elementData?: string;
-    insertIndex?: number;
-    isRemoval?: boolean;
-    elementId?: string;
-    draggedElement?: Node;
-    dropPosition?: { x: number; y: number };
+    elementData: string;
     position: { x: number; y: number };
   } | null>(null);
-  
-  // REMOVIDO: Estados para handlers React Flow - funcionalidade já implementada via DOM
+  const [draggingChildNode, setDraggingChildNode] = useState<{
+    nodeId: string;
+    originalNodeId: string;
+    groupNodeId: string;
+    nodeData: Node;
+  } | null>(null);
+
+  // Remover box selection state e handlers
 
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  
+  // Função de logging para debugging
+  const addDebugLog = useCallback((type: 'info' | 'warning' | 'error' | 'success', message: string, data?: any) => {
+    const logEntry = {
+      id: Date.now().toString(),
+      type,
+      message,
+      timestamp: new Date(),
+      data,
+    };
+    setDebugLogs(prev => [logEntry, ...prev].slice(0, 100));
+    console.log(`🔧 [${type.toUpperCase()}] ${message}`, data || '');
+  }, []);
+
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.stopPropagation();
     setEdges((edges) =>
@@ -96,7 +112,8 @@ export function useFlowLogic() {
       )
     );
     setSelectedEdgeId(edge.id);
-  }, [setEdges]);
+    addDebugLog('info', 'Edge selecionado', { edgeId: edge.id, source: edge.source, target: edge.target });
+  }, [setEdges, addDebugLog]);
 
   // Função para deselecionar edges ao clicar fora
   const clearEdgeSelection = useCallback(() => {
@@ -109,155 +126,126 @@ export function useFlowLogic() {
   useEffect(() => {
     const handleGroupDrop = (event: CustomEvent) => {
       setPendingGroupDrop(event.detail);
-    };
-    const handleRemoveFromGroup = (event: CustomEvent) => {
-      setPendingGroupDrop({
-        ...event.detail,
-        isRemoval: true,
-      });
-    };
-    const handleSelectChildNode = (event: CustomEvent) => {
-      // Permitir seleção de elementos individuais dentro dos grupos
-      const { nodeId, node } = event.detail;
-      console.log('Selecionando elemento individual:', nodeId);
-      // Aqui poderíamos implementar lógica adicional de seleção se necessário
+      addDebugLog('info', 'Group drop event recebido', event.detail);
     };
     window.addEventListener('groupDrop', handleGroupDrop as EventListener);
-    window.addEventListener('removeFromGroup', handleRemoveFromGroup as EventListener);
-    window.addEventListener('selectChildNode', handleSelectChildNode as EventListener);
     return () => {
       window.removeEventListener('groupDrop', handleGroupDrop as EventListener);
-      window.removeEventListener('removeFromGroup', handleRemoveFromGroup as EventListener);
-      window.removeEventListener('selectChildNode', handleSelectChildNode as EventListener);
     };
-  }, []);
+  }, [addDebugLog]);
 
   useEffect(() => {
     if (pendingGroupDrop) {
       try {
-        if (pendingGroupDrop.isRemoval && pendingGroupDrop.elementId && pendingGroupDrop.draggedElement) {
-          // Lógica de remoção do grupo
-          const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
-          if (targetGroup) {
-            const dropPosition = pendingGroupDrop.dropPosition || pendingGroupDrop.position;
+        const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
+        const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
+        if (targetGroup) {
+          // USAR DADOS CONSISTENTES DO PREVIEW
+          const calculatedPosition = (pendingGroupDrop as any).calculatedPosition;
+          const dropIndex = (pendingGroupDrop as any).dropIndex || 0;
+          
+          console.log('🎯 PROCESSANDO GROUP DROP COM DADOS CONSISTENTES:', {
+            calculatedPosition,
+            dropIndex,
+            targetGroupPosition: targetGroup.position
+          });
+          
+          // POSIÇÃO FINAL: grupo position + calculatedPosition (sem conversões)
+          const finalPosition = {
+            x: targetGroup.position.x + calculatedPosition.x,
+            y: targetGroup.position.y + calculatedPosition.y,
+          };
+          
+          console.log('🎯 POSIÇÃO FINAL CALCULADA:', {
+            groupPosition: targetGroup.position,
+            calculatedPosition,
+            finalPosition
+          });
+          
+          // Corrigir o type do node
+          const typeMap: Record<string, string> = {
+            start: 'startNode',
+            texto: 'textNode',
+            imagem: 'imageNode',
+            audio: 'audioNode',
+          };
+          const elementType = (element.type || '').toLowerCase();
+          const nodeType = typeMap[elementType] || 'textNode';
+          
+          // Obter dimensões do elemento
+          const elementDimensions = NODE_SIZES[elementType] || NODE_SIZES['default'];
+          
+          const newNode: Node = {
+            id: `${element.type}-${nodeId}`,
+            type: nodeType,
+            position: finalPosition,
+            data: {
+              label: element.label,
+              element,
+              width: elementDimensions.width,
+              height: elementDimensions.height,
+              // MARCAR COMO CHILD DO GRUPO
+              parentGroupId: targetGroup.id,
+            },
+            parentId: targetGroup.id,
+          };
+          
+          setNodes((nds) => {
+            // INSERIR NA ORDEM CORRETA NO GRUPO
+            const newNodes = [...nds];
+            const groupChildNodes = newNodes.filter(n => n.parentId === targetGroup.id);
             
-            // Calcular posição para colocar o elemento fora do grupo
-            let finalPosition;
-            if (reactFlowRef.current) {
-              const reactFlowInstance = reactFlowRef.current;
-              const point = reactFlowInstance.screenToFlowPosition({
-                x: dropPosition.x,
-                y: dropPosition.y,
-              });
-              finalPosition = point;
+            // INSERIR O NOVO NÓ NA POSIÇÃO CORRETA
+            if (dropIndex >= groupChildNodes.length) {
+              // Inserir no final
+              newNodes.push(newNode);
             } else {
-              finalPosition = dropPosition;
+              // Encontrar onde inserir baseado no dropIndex
+              const nonGroupNodes = newNodes.filter(n => !n.parentId || n.parentId !== targetGroup.id);
+              const childrenToInsert = [...groupChildNodes];
+              childrenToInsert.splice(dropIndex, 0, newNode);
+              
+              // Recompor a lista mantendo a ordem: nós não-filhos + filhos do grupo na ordem correta
+              const finalNodes = [
+                ...nonGroupNodes,
+                ...childrenToInsert
+              ];
+              
+              addDebugLog('success', `🎯 COMPONENTE INSERIDO NA POSIÇÃO DO PREVIEW!`, {
+                nodeId: newNode.id,
+                type: newNode.type,
+                groupId: targetGroup.id,
+                position: finalPosition,
+                elementLabel: element.label,
+                dropIndex: dropIndex,
+                method: 'calculated-position-consistent',
+                finalPosition
+              });
+              
+              return finalNodes;
             }
             
-            // Remover parentId para tirar o elemento do grupo
-            const updatedElement = {
-              ...pendingGroupDrop.draggedElement,
-              parentId: undefined,
-              position: finalPosition,
-            };
-            
-            setNodes((nds) =>
-              nds.map(node =>
-                node.id === pendingGroupDrop.elementId ? updatedElement : node
-              )
-            );
-            
-            console.log(`✅ Elemento '${pendingGroupDrop.elementId}' removido do grupo '${targetGroup.id}'`);
-          }
-        } else if (pendingGroupDrop.elementData) {
-          // Lógica de adição ao grupo (mantém a lógica existente)
-          const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
-          const targetGroup = nodes.find(n => n.id === pendingGroupDrop.groupId);
-          if (targetGroup) {
-            const existingChildren = nodes.filter(n => n.parentId === targetGroup.id);
-            const insertIndex = Math.max(0, Math.min(pendingGroupDrop.insertIndex || 0, existingChildren.length));
-            const padding = 16;
-            const childWidth = 250;
-            const childHeight = 80;
-            const maxChildrenPerRow = 1;
-            const row = Math.floor(insertIndex / maxChildrenPerRow);
-            const col = insertIndex % maxChildrenPerRow;
-            const relativeX = padding + (col * (childWidth + 8));
-            const relativeY = 80 + (row * (childHeight + 8));
-            const finalPosition = {
-              x: targetGroup.position.x + relativeX,
-              y: targetGroup.position.y + relativeY,
-            };
-            const typeMap: Record<string, string> = {
-              start: 'startNode',
-              texto: 'textNode',
-              imagem: 'imageNode',
-              audio: 'audioNode',
-            };
-            const elementType = (element.type || '').toLowerCase();
-            const nodeType = typeMap[elementType] || 'textNode';
-            const newNode: Node = {
-              id: `${element.type}-${nodeId}`,
-              type: nodeType,
-              position: finalPosition,
-              data: {
-                label: element.label,
-                element,
-              },
-              parentId: targetGroup.id,
-            };
-            
-            // Inserir o nó na posição correta e reorganizar os elementos existentes
-            setNodes((nds) => {
-              const groupChildren = nds.filter(n => n.parentId === targetGroup.id);
-              const otherNodes = nds.filter(n => n.parentId !== targetGroup.id);
-              
-              const newChildNodes = [...groupChildren];
-              newChildNodes.splice(insertIndex, 0, newNode);
-              
-              const reorganizedNodes = newChildNodes.map((childNode, index) => {
-                const maxChildrenPerRow = 1;
-                const row = Math.floor(index / maxChildrenPerRow);
-                const col = index % maxChildrenPerRow;
-                const relativeX = padding + (col * (childWidth + 8));
-                const relativeY = 80 + (row * (childHeight + 8));
-                const newPosition = {
-                  x: targetGroup.position.x + relativeX,
-                  y: targetGroup.position.y + relativeY,
-                };
-                
-                if (childNode.position.x !== newPosition.x || childNode.position.y !== newPosition.y) {
-                  return {
-                    ...childNode,
-                    position: newPosition,
-                  };
-                }
-                return childNode;
-              });
-              
-              return [...otherNodes, ...reorganizedNodes];
-            });
-            
-            setNodeId((id) => id + 1);
-            console.log(`✅ Elemento inserido na posição ${insertIndex} do grupo ${targetGroup.id}`);
-          }
+            return newNodes;
+          });
+          
+          setNodeId((id) => id + 1);
         }
       } catch (error) {
         console.error('Erro ao processar group drop:', error);
+        addDebugLog('error', 'Erro ao processar group drop', error);
       }
       setPendingGroupDrop(null);
     }
-  }, [pendingGroupDrop, nodes, nodeId, setNodes, reactFlowRef]);
+  }, [pendingGroupDrop, nodes, nodeId, setNodes, addDebugLog]);
+
+  // Removido o timeout desnecessário que poderia interferir com o posicionamento
 
   const onConnect = useCallback(
     (params: Connection) => handleConnect(params, setEdges, nodes, edges),
     [setEdges, nodes, edges]
   );
 
-  // REMOVIDO: Handlers React Flow - funcionalidade já implementada via DOM no GroupNode.tsx
-  // A implementação DOM com stopPropagation() já funciona corretamente
-  // e não interfere com o sistema de drag do React Flow
-
+  // Substituir handleNodesChange por repasse direto do onNodesChange
   const handleNodesChange = useCallback(
     (changes: any[]) => {
       // Intercepta remoção do node 'start'
@@ -272,37 +260,6 @@ export function useFlowLogic() {
     [onNodesChange]
   );
 
-  // Handler para desagrupamento automático quando arrasto começa
-  const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
-    if (node.parentId) {
-      // Encontrar o nó pai (grupo)
-      const parentNode = nodes.find(n => n.id === node.parentId);
-      
-      if (parentNode) {
-        // Calcular posição absoluta: posição do grupo + posição relativa do filho
-        const absolutePosition = {
-          x: parentNode.position.x + node.position.x,
-          y: parentNode.position.y + node.position.y,
-        };
-
-        // Atualizar o nó removendo o parentId e definindo posição absoluta
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === node.id
-              ? {
-                  ...n,
-                  parentId: undefined,
-                  position: absolutePosition,
-                }
-              : n
-          )
-        );
-
-        console.log(`🔗 Nó '${node.id}' desagrupado do grupo '${parentNode.id}' - Posição absoluta:`, absolutePosition);
-      }
-    }
-  }, [nodes, setNodes]);
-
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -316,9 +273,14 @@ export function useFlowLogic() {
     
     // Verifica se há dados sendo arrastados
     const childNodeData = event.dataTransfer.getData('application/reactflow-child');
+    const childFromGroupData = event.dataTransfer.getData('application/reactflow-child-from-group');
     const elementData = event.dataTransfer.getData('application/reactflow');
     
-    if (childNodeData) {
+    if (childFromGroupData) {
+      console.log('🚀 Nó filho sendo arrastado para fora do grupo:', childFromGroupData);
+      // Permite o drop no canvas
+      event.dataTransfer.dropEffect = 'copy';
+    } else if (childNodeData) {
       console.log('🔄 Nó filho sendo arrastado globalmente:', childNodeData);
     }
     if (elementData) {
@@ -362,7 +324,7 @@ export function useFlowLogic() {
         type: 'groupNode',
         position: { x: dropPosition.x - 150, y: dropPosition.y - 80 },
         data: {
-          title: `Grupo #${groupId}`,
+          title: `Group #${groupId}`,
           nodes: [],
         },
       };
@@ -400,6 +362,10 @@ export function useFlowLogic() {
       // Adicionar grupo e componente ao estado
       setNodes((nds) => {
         const newNodes = [...nds, newGroup, newNode];
+        addDebugLog('success', 'Grupo e componente criados', {
+          group: { id: newGroup.id, title: newGroup.data.title },
+          component: { id: newNode.id, type: newNode.type }
+        });
         return newNodes;
       });
       
@@ -409,38 +375,157 @@ export function useFlowLogic() {
       console.log('Grupo e componente criados:', { group: newGroup, component: newNode });
     } catch (error) {
       console.error('Erro ao processar drop:', error);
+      addDebugLog('error', 'Erro ao processar drop', error);
     }
-  }, [nodeId, groupId, setNodes, setNodeId, setGroupId]);
+  }, [nodeId, groupId, setNodes, setNodeId, setGroupId, addDebugLog]);
+
+  // Função para remover elemento do grupo e criar nó independente
+  const handleRemoveChildFromGroup = useCallback((
+    event: React.DragEvent,
+    childNodeId: string,
+    childNodeData?: Node
+  ) => {
+    try {
+      // 1️⃣ Busca o nó filho (prioriza parâmetro, senão busca no estado)
+      let childNode = childNodeData ?? nodes.find(n => n.id === childNodeId);
+      if (!childNode) {
+        console.error('❌ Nó filho não encontrado:', childNodeId);
+        return;
+      }
+
+      // 2️⃣ Identifica o grupo pai
+      const parentGroup = nodes.find(n => n.id === childNode.parentId);
+      if (!parentGroup) {
+        console.error('❌ Grupo pai não encontrado para:', childNodeId);
+        return;
+      }
+
+      // 3️⃣ Converte a posição da tela para coordenadas do flow (mesmo helper usado em @flow/system)
+      const dropPosition = reactFlowRef.current
+        ? reactFlowRef.current.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          })
+        : {
+            x: event.clientX - event.currentTarget.getBoundingClientRect().left,
+            y: event.clientY - event.currentTarget.getBoundingClientRect().top,
+          };
+
+      console.log('🎯 REMOVENDO ELEMENTO DO GRUPO:', {
+        childNodeId: childNode.id,
+        childLabel: childNode.data?.label,
+        groupId: parentGroup.id,
+        groupTitle: parentGroup.data?.title,
+        dropPosition,
+      });
+
+      // 4️⃣ Cria o nó independente com ID único e limpa referências ao grupo
+      const newIndependentNode: Node = {
+        ...childNode,
+        id: `${childNode.id}-independent-${Date.now()}`,
+        position: dropPosition,
+        parentId: undefined,
+        data: {
+          ...childNode.data,
+          parentGroupId: undefined,
+          isEditing: false,
+        },
+      };
+
+      // 5️⃣ Atualiza o estado:
+      //    • Remove o filho original do array de nós
+      //    • Atualiza o grupo removendo o ID do filho de `childNodes`
+      //    • Insere o novo nó independente
+      setNodes(current => {
+        const withoutChild = current.filter(n => n.id !== childNode.id);
+        const updatedGroup = withoutChild.map(n =>
+          n.id === parentGroup.id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  childNodes: (n.data as any)?.childNodes?.filter(
+                    (c: any) => c.id !== childNode.id
+                  ),
+                },
+              }
+            : n
+        );
+
+        const finalNodes = [...updatedGroup, newIndependentNode];
+
+        addDebugLog('success', 'Elemento removido do grupo e tornado independente', {
+          originalChildId: childNode.id,
+          newIndependentId: newIndependentNode.id,
+          groupId: parentGroup.id,
+          dropPosition,
+          method: 'drag-outside-group',
+        });
+
+        return finalNodes;
+      });
+
+      // 6️⃣ Limpa estado de arrasto
+      setDraggingChildNode(null);
+    } catch (error) {
+      console.error('❌ Erro ao remover elemento do grupo:', error);
+      addDebugLog('error', 'Erro ao remover elemento do grupo', error);
+    }
+  }, [nodes, setNodes, addDebugLog]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const elementData = event.dataTransfer.getData('application/reactflow');
+      const elementData =
+        event.dataTransfer.getData('application/reactflow') ||
+        event.dataTransfer.getData('application/json') ||
+        event.dataTransfer.getData('text/plain');
       const childNodeData = event.dataTransfer.getData('application/reactflow-child');
+      const childFromGroupData = event.dataTransfer.getData('application/reactflow-child-from-group');
+      const childNodeDataJson = event.dataTransfer.getData('application/reactflow-child-node-data');
       
       console.log('🎯 DROP EVENT:', {
         hasElementData: !!elementData,
+        types: Array.from(event.dataTransfer?.types || []),
         hasChildNodeData: !!childNodeData,
+        hasChildFromGroupData: !!childFromGroupData,
         elementLabel: elementData ? (() => {
           try { return JSON.parse(elementData).label; } catch { return 'unknown'; }
-        })() : null,
+          })() : null,
         childNodeId: childNodeData,
+        childFromGroupId: childFromGroupData,
+        hasChildNodeDataJson: !!childNodeDataJson,
         clientX: event.clientX,
         clientY: event.clientY
       });
+      
+      // Lida com a retirada de elemento do grupo
+      if (childFromGroupData) {
+        let parsedChildNodeData: Node | undefined;
+        if (childNodeDataJson) {
+          try {
+            parsedChildNodeData = JSON.parse(childNodeDataJson);
+          } catch (error) {
+            console.warn('❌ Erro ao parsear childNodeDataJson:', error);
+          }
+        }
+        
+        handleRemoveChildFromGroup(event, childFromGroupData, parsedChildNodeData);
+        return;
+      }
       
       if (!elementData && !childNodeData) {
         console.log('⚠️ Nenhum dado encontrado no drop');
         return;
       }
       
-      // Processa o drop imediatamente sem setTimeout
-      if (!pendingGroupDrop) {
+      // Só processa drops globais se não há pendência de grupo
+      if (!pendingGroupDrop && !childNodeData) {
         processDrop(event, elementData, reactFlowBounds);
       }
     },
-    [nodeId, setNodes, nodes, pendingGroupDrop, processDrop]
+    [nodeId, setNodes, nodes, pendingGroupDrop, processDrop, handleRemoveChildFromGroup, addDebugLog]
   );
 
   const createGroup = useCallback(() => {
@@ -456,18 +541,23 @@ export function useFlowLogic() {
     setNodes((nds) => {
       const newNodes = nds.concat(newGroup);
       // Removido: ajuste automático da visualização (fitView)
+      addDebugLog('info', 'Grupo criado manualmente', {
+        groupId: newGroup.id,
+        title: newGroup.data.title,
+        position: newGroup.position
+      });
       return newNodes;
     });
     setGroupId((id) => id + 1);
-  }, [groupId, setNodes]);
+  }, [groupId, setNodes, addDebugLog]);
 
   const nodeColor = useMemo(() => {
     return (node: Node) => {
       switch (node.type) {
         case 'startNode':
-          return '#2563eb';
+          return '#60a5fa';
         case 'groupNode':
-          return '#641172';
+          return '#1a1a2e';
         case 'flowNode':
           const element = (node.data as any)?.element;
           if (element?.category === 'bubbles') return '#16a34a';
@@ -488,20 +578,12 @@ export function useFlowLogic() {
   const processedNodes = useMemo(() => {
     return visibleNodes.map(node => {
       if (node.type === 'groupNode') {
-        // Filtra e ordena nós filhos pela posição (x, y) para manter a ordem correta
-        const childNodes = nodes
-          .filter(n => n.parentId === node.id)
-          .sort((a, b) => {
-            // Ordena primeiro por Y (linha), depois por X (coluna)
-            if (a.position.y !== b.position.y) {
-              return a.position.y - b.position.y;
-            }
-            return a.position.x - b.position.x;
-          });
+        // Filtra nós filhos de forma estável
+        const childNodes = nodes.filter(n => n.parentId === node.id);
         
         // Evita atualizar o data se não houve mudanças significativas nos filhos
         const existingChildIds = (node.data as any)?.childNodesIds || [];
-        const newChildIds = childNodes.map(n => n.id);
+        const newChildIds = childNodes.map(n => n.id).sort();
         
         // Compara apenas os IDs dos filhos para detectar mudanças
         const hasChanged = existingChildIds.length !== newChildIds.length ||
@@ -554,9 +636,8 @@ export function useFlowLogic() {
     onDragOver,
     createGroup,
     onPaneClick: clearEdgeSelection,
-    onNodeDragStart, // Handler para desagrupamento automático
     reactFlowRef, // exporta a ref
-    // Handlers para desaninhamento de nós filhos
-    // REMOVIDO: Handlers foram removidos, pois a funcionalidade já existe no GroupNode.tsx
+    debugLogs,
+    addDebugLog,
   };
 }

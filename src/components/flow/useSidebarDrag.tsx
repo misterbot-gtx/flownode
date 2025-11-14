@@ -19,12 +19,11 @@ const draggingStyle = `
     opacity: 1;
     border-radius: 8px;
     filter: none;
-    /* Começa sem rotação, depois anima para -6deg */
     transform: rotate(0deg);
     transition: box-shadow 0.2s, border 0.2s, transform 0.3s cubic-bezier(0.4,0,0.2,1);
     pointer-events: none;
     user-select: none;
-    padding: 12px;
+    padding: 7.5px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
   .react-flow__node-dragging {

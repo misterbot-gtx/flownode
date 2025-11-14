@@ -1,7 +1,22 @@
-Eu quero que faça o seguite na logica de preview ao inves de manter a ideia atual de que ao passar em cima do proximo
-item mude para ele quero que faça o seguite quero que no item que mostra o preview matem o estádo final até que seja o mouse passe em cima
-do outro view-divider para evitar o problema de ficar em loop de abrir e fechar.Eu quero que faça o seguite na logica de preview ao inves de manter
-a ideia atual de que ao passar em cima do proximo item mude para ele quero que faça o seguite quero que no item que mostra o preview matem o estádo
-final até que seja o mouse passe em cima do outro view-divider para evitar o problema de ficar em loop de abrir e fechar.
+Eu quero fazer o seguite quero que na depedencia faça o seguite eu crie um grupo que eu coloco elementos nele no meu codigo e a depedencia atual do flow
+ quando eu tento arrasta o elemento para fora não funcionana eu não quero usar o sistema nativo de subflow do react flow e sim criar uma logica para os
+ elementos detro do grupo quando tentado arrasta para fora é retirado do grupo que no caso ele é um nó unico ou seja quero que para cada elemento dentro
+ desse no tenha sua mobilidade como o do typebot.
+
+Eu quero que faça o seguite para evitar esse problema eu tinha inicialmente criado essa logica de preview persolaizado para subistituir o o preview padrão do reactflow pois
+ele não cria o elemento real e sim é um dragdrop fake e eu quero que essa logica minha de preview coloque na depedencia diretamente e tire ela nativa do meu codigo
+deixando ela na depedencia e no front poder modificar o elemento preview.
+
+Eu quero que corrija a logica de quando que eu mecher nos nós ele aparece isso no caso o valor de quando ele é solto do flow e eu não quero isso só quando
+for tentar tirar o nó do bloco filho do grupo criado.
+
+"dev": "concurrently \"rollup --config node:@flow/rollup-config --watch\" pnpm:css-watch",
 
 
+pnpm dlx turbo run dev
+cd packages/flow && pnpm run dev
+
+cd packages/flow && pnpm build
+
+
+pnpm dev:with-flow (RAIZ)

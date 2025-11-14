@@ -1,5 +1,5 @@
 import { memo, useState, useRef } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeProps } from '@flow/react';
 import { Box, Flex, Text, Textarea, useToken } from '@chakra-ui/react';
 
 const TextNode = memo(({ data, id, selected }: NodeProps) => {
@@ -51,7 +51,7 @@ const TextNode = memo(({ data, id, selected }: NodeProps) => {
 
   // Função utilitária para quebrar o texto em linhas de até 23 caracteres
   function splitTextByLength(text: string, maxLen: number) {
-    const lines = [];
+    const lines: string[] = [];
     let i = 0;
     while (i < text.length) {
       lines.push(text.slice(i, i + maxLen));
@@ -75,6 +75,8 @@ const TextNode = memo(({ data, id, selected }: NodeProps) => {
 
   return (
     <Box
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
       minW="180px"
       minH="80px"
       p="4"
@@ -86,6 +88,7 @@ const TextNode = memo(({ data, id, selected }: NodeProps) => {
       transition="all 0.2s ease"
       _hover={{ boxShadow: '0 0 0 2px rgba(66, 153, 225, 0.3)' }}
       position="relative"
+      style={{ userSelect: 'none' }}
     >
       {/* Handle de entrada (top) */}
       <Handle type="target" position={Position.Top} />

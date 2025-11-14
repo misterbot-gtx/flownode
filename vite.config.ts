@@ -6,7 +6,7 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5400,
   },
   plugins: [
     react(),
@@ -15,8 +15,5 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  css: {
-    postcss: './postcss.config.js',
   },
 }));

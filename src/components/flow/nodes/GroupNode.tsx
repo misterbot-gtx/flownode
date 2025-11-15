@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, Node, useSidebarDragPreview } from '@flow/react';
 import { Edit3, Plus, Settings } from 'lucide-react';
+import { Box, Flex, Text, Input } from '@chakra-ui/react';
 
 interface GroupNodeData {
   title: string;
@@ -74,14 +75,18 @@ const GroupChildNode = memo(
     };
 
     return (
-      <div
-        className={`
-          relative w-full p-3 rounded-lg border border-border/30 bg-flow-node/80
-          transition-all duration-200 hover:shadow-md
-          opacity-90
-          ${isDragOver ? 'border-primary bg-primary/10 shadow-lg' : ''}
-          nodrag
-        `}
+      <Box
+        position="relative"
+        w="full"
+        p="3"
+        borderRadius="lg"
+        borderWidth="1px"
+        borderColor={isDragOver ? 'hsl(var(--primary))' : 'hsl(var(--border) / 0.3)'}
+        bg={isDragOver ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--flow-node) / 0.8)'}
+        transition="all 0.2s"
+        boxShadow={isDragOver ? 'lg' : 'none'}
+        opacity={0.9}
+        className="nodrag"
         draggable
         onDragStart={handleDragStart}
         onDragEnd={(e) => {
@@ -90,22 +95,20 @@ const GroupChildNode = memo(
         }}
         style={{ visibility: hidden ? 'hidden' : 'visible' }}
       >
-        {/* Node Header */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm">{nodeData.element?.icon}</span>
-          <span className="text-xs font-medium text-foreground">
+        <Flex align="center" gap="2" mb="2">
+          <Text fontSize="sm">{nodeData.element?.icon}</Text>
+          <Text fontSize="xs" fontWeight="medium" color="hsl(var(--foreground))">
             {nodeData.label}
-          </span>
-          <span className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
+          </Text>
+          <Box as="span" fontSize="xs" color="hsl(var(--muted-foreground))" bg="hsl(var(--muted))" px="1" py="0.5" borderRadius="sm">
             Grupo
-          </span>
-        </div>
+          </Box>
+        </Flex>
 
-        {/* Node Content */}
-        <div className="text-xs text-muted-foreground">
+        <Text fontSize="xs" color="hsl(var(--muted-foreground))">
           {nodeData.content || 'Clique para editar...'}
-        </div>
-      </div>
+        </Text>
+      </Box>
     );
   }
 );
@@ -413,63 +416,79 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   };
 
   return (
-    <div
-      className={`
-        relative min-w-[280px] min-h-[120px] p-4 rounded-xl border-2 bg-flow-group 
-        transition-all duration-200 hover:shadow-lg
-        ${selected ? 'border-primary shadow-lg shadow-primary/20' : 'border-border/30 hover:border-border/50'}
-        ${isHovered ? 'shadow-md' : ''}
-        ${isDragOver ? 'border-primary shadow-2xl shadow-primary/30 z-20' : ''}
-      `}
+    <Box
+      position="relative"
+      minW="280px"
+      minH="120px"
+      p="4"
+      borderRadius="xl"
+      borderWidth="2px"
+      bg={'hsl(var(--flow-group))'}
+      transition="all 0.2s"
+      boxShadow={isDragOver ? '2xl' : selected ? 'lg' : 'none'}
+      borderColor={selected || isDragOver ? 'hsl(var(--primary))' : 'hsl(var(--border) / 0.3)'}
+      zIndex={isDragOver ? 20 : 'auto'}
+      role="group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Group Header */}
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/20">
+      <Flex align="center" justify="space-between" mb="4" pb="2" borderBottom="1px solid hsl(var(--border) / 0.2)">
         {isEditing ? (
-          <input
+          <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleSave}
             onKeyDown={handleKeyDown}
-            className="text-sm font-semibold bg-transparent border-none outline-none text-foreground focus:text-primary"
+            fontSize="sm"
+            fontWeight="semibold"
+            variant="unstyled"
+            size="sm"
+            h="1.25rem"
+            lineHeight="1.25rem"
+            py={0}
+            px={0}
+            bg="transparent"
+            border={0}
+            outline="none"
+            color="hsl(var(--foreground))"
             autoFocus
           />
         ) : (
-          <h3
-            className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+          <Text
+            fontSize="sm"
+            fontWeight="semibold"
+            color="hsl(var(--foreground))"
+            cursor="pointer"
             onClick={handleEditClick}
           >
             {title}
-          </h3>
+          </Text>
         )}
 
-        {/* Group Actions */}
-        {(isHovered || selected) && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleEditClick}
-              className="p-1 rounded-md hover:bg-flow-node-hover transition-colors"
-            >
-              <Edit3 className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-            </button>
-            <button className="p-1 rounded-md hover:bg-flow-node-hover transition-colors">
-              <Settings className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-            </button>
-          </div>
-        )}
-      </div>
+        <Flex
+          align="center"
+          gap="1"
+          opacity={selected || isHovered ? 1 : 0}
+          transition="opacity 0.2s"
+        >
+          <button className="icones" onClick={handleEditClick} style={{ padding: 4, borderRadius: 6 }}>
+            <Edit3 className="w-3 h-3" />
+          </button>
+          <button className="icones" style={{ padding: 4, borderRadius: 6 }}>
+            <Settings className="w-3 h-3" />
+          </button>
+        </Flex>
+      </Flex>
 
-      {/* Group Content Area */}
-      <div
-        ref={dragRef}
+      <Box
+        ref={dragRef as any}
         className={`${isDragOver ? 'view' : 'view'} nodrag`}
       >
         {localChildNodes && localChildNodes.length > 0 ? (
-          <div className="view-content">
+          <Box className="view-content">
             {/* Divider no topo */}
             {(() => {
               if (localChildNodes.length === 0) return null;
@@ -494,7 +513,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
                 isActive = false;
               }
               return (
-                <div
+                <Box
                   key={childNode.id + '-' + index}
                   className={`view-child ${draggedChildId === childNode.id ? 'no-space' : ''}`}
                 >
@@ -509,19 +528,19 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
                     isActive={isActive}
                     extraClass={draggedChildId === childNode.id ? 'close' : ''}
                   />
-                </div>
+                </Box>
               );
             })}
-          </div>
+          </Box>
         ) : (
-          <div className="flex items-center justify-center text-muted-foreground text-sm py-4 mt-2 mb-2">
-            <div className="text-center">
-              <Plus className="w-5 h-5 mx-auto mb-1 opacity-50" />
-              <span className="opacity-70">Arraste elementos aqui</span>
-            </div>
-          </div>
+          <Flex align="center" justify="center" color="hsl(var(--muted-foreground))" fontSize="sm" py="4" mt="2" mb="2">
+            <Box textAlign="center">
+              <Plus className="w-5 h-5" style={{ margin: '0 auto', marginBottom: '4px', opacity: 0.5 }} />
+              <Text opacity={0.7}>Arraste elementos aqui</Text>
+            </Box>
+          </Flex>
         )}
-      </div>
+      </Box>
 
       {/* Connection Handles */}
       <Handle
@@ -536,7 +555,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         className="absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-2 border-primary bg-background transition-transform"
         style={{ bottom: '-1px', width: 7 }}
       />
-    </div>
+    </Box>
   );
 });
 

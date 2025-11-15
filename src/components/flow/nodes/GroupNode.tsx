@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node } from '@flow/react';
+import { Handle, Position, NodeProps, Node, useSidebarDragPreview } from '@flow/react';
 import { Edit3, Plus, Settings } from 'lucide-react';
 
 interface GroupNodeData {
@@ -19,12 +19,25 @@ const GroupChildNode = memo(
     node,
     index,
     isDragOver,
+    hidden,
   }: {
     node: Node;
     index: number;
     isDragOver?: boolean;
+    hidden?: boolean;
   }) => {
     const nodeData = node.data as any;
+    const { startPreview, stopPreview } = useSidebarDragPreview<{ icon: string; label: string }>({
+      render: (payload) => {
+        const el = document.createElement('div');
+        el.className = 'dragging-previews';
+        el.innerHTML = `
+          <span style="font-size: 1.5rem;">${payload.icon}</span>
+          <span style="font-size: 1rem; color: white; margin-left: 8px;">${payload.label}</span>
+        `;
+        return el;
+      },
+    });
 
     const handleDragStart = (e: React.DragEvent) => {
       // Define o tipo de arrasto como saída do grupo
@@ -33,31 +46,18 @@ const GroupChildNode = memo(
       e.dataTransfer.setData('application/reactflow-child-node-data', JSON.stringify(node));
       e.dataTransfer.effectAllowed = 'move';
       
-      // Cria um preview visual do elemento sendo arrastado
-      const dragPreview = document.createElement('div');
-      dragPreview.innerHTML = `
-        <div style="
-          background: rgba(15, 23, 42, 0.9);
-          border: 2px solid #3b82f6;
-          border-radius: 8px;
-          padding: 8px 12px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-          transform: rotate(-2deg);
-          pointer-events: none;
-          user-select: none;
-          min-width: 120px;
-        ">
-          <span style="font-size: 1rem; margin-right: 8px;">${nodeData.element?.icon || '📄'}</span>
-          <span style="font-size: 0.875rem; color: white;">${nodeData.label}</span>
-        </div>
-      `;
-      document.body.appendChild(dragPreview);
-      e.dataTransfer.setDragImage(dragPreview.firstElementChild as HTMLElement, 60, 20);
-      
-      // Remove o preview após o drag
-      setTimeout(() => {
-        document.body.removeChild(dragPreview);
-      }, 0);
+      const invisibleImg = document.createElement('div');
+      invisibleImg.style.width = '1px';
+      invisibleImg.style.height = '1px';
+      invisibleImg.style.opacity = '0';
+      document.body.appendChild(invisibleImg);
+      e.dataTransfer.setDragImage(invisibleImg, 0, 0);
+      setTimeout(() => document.body.removeChild(invisibleImg), 0);
+
+      startPreview(e.nativeEvent, {
+        icon: nodeData.element?.icon || '📄',
+        label: nodeData.label,
+      });
       
       console.log(`🚀 Iniciando arrasto do elemento "${nodeData.label}" (${node.id}) para fora do grupo`);
       
@@ -86,7 +86,9 @@ const GroupChildNode = memo(
         onDragStart={handleDragStart}
         onDragEnd={(e) => {
           console.log(`✅ Arrasto do elemento "${nodeData.label}" (${node.id}) finalizado`);
+          stopPreview();
         }}
+        style={{ visibility: hidden ? 'hidden' : 'visible' }}
       >
         {/* Node Header */}
         <div className="flex items-center gap-2 mb-2">
@@ -122,6 +124,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const [localChildNodes, setLocalChildNodes] = useState<Node[]>(groupData.childNodes || []);
   const dragRef = useRef<HTMLDivElement>(null);
   const [draggedChildId, setDraggedChildId] = useState<string | null>(null);
+  const draggedChildNodeRef = useRef<Node | null>(null);
   const previousDragOverIndexRef = useRef<number>(-1); // Para comparar índices
   // NOVO: Armazenar a calculatedPosition para posicionamento exato
   const [calculatedPosition, setCalculatedPosition] = useState<{x: number, y: number} | null>(null);
@@ -158,9 +161,22 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
+    const onChildNodeDragStart = (ev: any) => {
+      const detail = ev?.detail || {};
+      if (detail.childNodeId) {
+        setIsDragging(true);
+        setDraggedChildId(detail.childNodeId);
+        draggedChildNodeRef.current = detail.nodeData as Node;
+        setIsPreviewMode(true);
+        setIsPreviewStable(true);
+        setLocalChildNodes((prev) => prev.filter((n) => n.id !== detail.childNodeId));
+      }
+    };
+    window.addEventListener('childNodeDragStart', onChildNodeDragStart as any);
     return () => {
       window.removeEventListener('dragstart', handleDragStart);
       window.removeEventListener('dragend', handleDragEnd);
+      window.removeEventListener('childNodeDragStart', onChildNodeDragStart as any);
     };
   }, []);
 
@@ -269,6 +285,13 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         
         if (isChildNode) {
           console.log(`❌ Nó filho '${draggedNodeId}' saiu do foco do grupo '${title}'`);
+          // Remove imediatamente o child da visão do grupo
+          setLocalChildNodes((prev) => prev.filter((n) => n.id !== draggedNodeId));
+          // Emite evento opcional de remoção visual
+          const removedEv = new CustomEvent('childNodeViewRemoved', {
+            detail: { groupId: id, childNodeId: draggedNodeId }
+          });
+          window.dispatchEvent(removedEv);
         } else {
           const elementData = e.dataTransfer.getData('application/reactflow');
           if (elementData) {
@@ -355,35 +378,38 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     // Se for um nó filho sendo movido dentro do grupo
     const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
     if (draggedNodeId) {
-      const draggedNode = localChildNodes.find((node) => node.id === draggedNodeId);
+      const draggedExisting = localChildNodes.find((node) => node.id === draggedNodeId);
+      const draggedNode = draggedExisting || draggedChildNodeRef.current;
       if (draggedNode) {
         const updatedNodes = [...localChildNodes];
         const draggedIndex = updatedNodes.findIndex((node) => node.id === draggedNodeId);
         if (draggedIndex !== -1) {
           updatedNodes.splice(draggedIndex, 1);
-          updatedNodes.splice(dragOverIndex >= 0 ? dragOverIndex : localChildNodes.length, 0, draggedNode);
-          setLocalChildNodes(updatedNodes);
-
-          const customEvent = new CustomEvent('childNodeDrop', {
-            detail: {
-              groupId: id,
-              targetIndex: dragOverIndex >= 0 ? dragOverIndex : localChildNodes.length,
-              elementId: draggedNodeId,
-              updatedNodes: updatedNodes,
-              position: {
-                x: e.clientX,
-                y: e.clientY,
-              },
-            },
-          });
-          window.dispatchEvent(customEvent);
         }
+        const insertIndex = dragOverIndex >= 0 ? dragOverIndex : updatedNodes.length;
+        updatedNodes.splice(insertIndex, 0, draggedNode);
+        setLocalChildNodes(updatedNodes);
+
+        const customEvent = new CustomEvent('childNodeDrop', {
+          detail: {
+            groupId: id,
+            targetIndex: insertIndex,
+            elementId: draggedNodeId,
+            updatedNodes: updatedNodes,
+            position: {
+              x: e.clientX,
+              y: e.clientY,
+            },
+          },
+        });
+        window.dispatchEvent(customEvent);
       }
     }
     
     // Reset calculatedPosition após drop
     setCalculatedPosition(null);
     setDragOverIndex(-1);
+    draggedChildNodeRef.current = null;
   };
 
   return (
@@ -469,7 +495,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
               }
               return (
                 <div key={childNode.id + '-' + index} className="view-child">
-                  <GroupChildNode node={childNode} index={index} isDragOver={false} />
+                  <GroupChildNode node={childNode} index={index} isDragOver={false} hidden={draggedChildId === childNode.id} />
                   <DividerWithHover isDragging={isDragging} isActive={isActive} />
                 </div>
               );

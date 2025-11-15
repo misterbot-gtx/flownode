@@ -13,10 +13,8 @@ for tentar tirar o nó do bloco filho do grupo criado.
 "dev": "concurrently \"rollup --config node:@flow/rollup-config --watch\" pnpm:css-watch",
 
 
-pnpm dlx turbo run dev
-cd packages/flow && pnpm run dev
+pnpm i
 
-cd packages/flow && pnpm build
+sh build.sh
 
-
-pnpm dev:with-flow (RAIZ)
+pnpm dev:with-flow

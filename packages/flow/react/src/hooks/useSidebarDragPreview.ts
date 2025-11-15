@@ -73,7 +73,7 @@ export function useSidebarDragPreview<Payload = any>(options?: UseSidebarDragPre
 
     const updatePosition = (x: number, y: number) => {
       const rect = el.getBoundingClientRect();
-      const ox = rect.width / 20;
+      const ox = rect.width / 2;
       const oy = rect.height / 2;
       el.style.left = `${x - ox}px`;
       el.style.top = `${y - oy}px`;
@@ -128,6 +128,12 @@ export function useSidebarDragPreview<Payload = any>(options?: UseSidebarDragPre
     };
 
     updatePosition(startEvent.clientX, startEvent.clientY);
+
+    setTimeout(() => {
+      try {
+        el.style.transform = 'rotate(-6deg)';
+      } catch {}
+    }, 10);
   }, [options, stopPreview]);
 
   return { startPreview, stopPreview };

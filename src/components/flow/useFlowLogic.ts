@@ -422,6 +422,124 @@ export function useFlowLogic() {
     }
   }, [nodeId, groupId, setNodes, setNodeId, setGroupId, addDebugLog]);
 
+  const extractChildToCanvasAtScreenPoint = useCallback((childNode: Node, screenPoint: { x: number; y: number }) => {
+    try {
+      const parentGroup = nodes.find(n => n.id === childNode.parentId);
+      if (!parentGroup) {
+        console.error('❌ Grupo pai não encontrado para:', childNode.id);
+        return;
+      }
+
+      const dropPosition = reactFlowRef.current
+        ? reactFlowRef.current.screenToFlowPosition({ x: screenPoint.x, y: screenPoint.y })
+        : { x: screenPoint.x, y: screenPoint.y } as any;
+
+      const newIndependentNode: Node = {
+        ...childNode,
+        id: `${childNode.id}-independent-${Date.now()}`,
+        position: dropPosition,
+        parentId: undefined,
+        data: {
+          ...childNode.data,
+          parentGroupId: undefined,
+          isEditing: false,
+        },
+      };
+
+      setNodes(current => {
+        const withoutChild = current.filter(n => n.id !== childNode.id);
+        const updatedGroup = withoutChild.map(n =>
+          n.id === parentGroup.id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  childNodes: (n.data as any)?.childNodes?.filter((c: any) => c.id !== childNode.id),
+                },
+              }
+            : n
+        );
+
+        const finalNodes = [...updatedGroup, newIndependentNode];
+
+        addDebugLog('success', 'Elemento removido do grupo via dnd-kit e tornado independente', {
+          originalChildId: childNode.id,
+          newIndependentId: newIndependentNode.id,
+          groupId: parentGroup.id,
+          dropPosition,
+          method: 'dnd-kit-extract-to-canvas',
+        });
+
+        return finalNodes;
+      });
+
+      setDraggingChildNode(null);
+    } catch (error) {
+      console.error('❌ Erro ao remover elemento do grupo via dnd-kit:', error);
+      addDebugLog('error', 'Erro ao remover elemento do grupo via dnd-kit', error);
+    }
+  }, [nodes, setNodes, addDebugLog]);
+
+  const addElementToGroupAtScreenPoint = useCallback((element: FlowElement, targetGroupId: string, screenPoint: { x: number; y: number }) => {
+    try {
+      const reactFlowInstance = reactFlowRef.current;
+      const flowPoint = reactFlowInstance
+        ? reactFlowInstance.screenToFlowPosition({ x: screenPoint.x, y: screenPoint.y })
+        : { x: screenPoint.x, y: screenPoint.y } as any;
+
+      const targetGroup = nodes.find(n => n.id === targetGroupId);
+      if (!targetGroup) {
+        return;
+      }
+
+      const relX = Math.max(16, flowPoint.x - targetGroup.position.x);
+      const relY = Math.max(80, flowPoint.y - targetGroup.position.y);
+
+      const elementType = (element.type || '').toLowerCase();
+      const { width, height } = NODE_SIZES[elementType] || NODE_SIZES['default'];
+      const typeMap: Record<string, string> = { start: 'startNode', texto: 'textNode', imagem: 'imageNode', audio: 'audioNode' };
+      const nodeType = typeMap[elementType] || 'textNode';
+
+      const newNode: Node = {
+        id: `${element.type}-${nodeId}`,
+        type: nodeType,
+        position: { x: targetGroup.position.x + relX, y: targetGroup.position.y + relY },
+        data: { label: element.label, element, width, height },
+        parentId: targetGroup.id,
+      };
+
+      setNodes((nds) => {
+        const nonGroupNodes = nds.filter(n => !n.parentId || n.parentId !== targetGroup.id);
+        const groupChildNodes = nds.filter(n => n.parentId === targetGroup.id);
+
+        let insertIndex = groupChildNodes.length;
+        if (groupChildNodes.length > 0) {
+          const itemHeight = 88;
+          const yRel = relY - 80;
+          insertIndex = Math.max(0, Math.min(Math.floor(yRel / itemHeight), groupChildNodes.length));
+        }
+
+        const childrenToInsert = [...groupChildNodes];
+        childrenToInsert.splice(insertIndex, 0, newNode);
+        const finalNodes = [...nonGroupNodes, ...childrenToInsert];
+
+        addDebugLog('success', 'Elemento inserido no grupo via dnd-kit', {
+          nodeId: newNode.id,
+          type: newNode.type,
+          groupId: targetGroup.id,
+          position: newNode.position,
+          dropIndex: insertIndex,
+        });
+
+        return finalNodes;
+      });
+
+      setNodeId((id) => id + 1);
+    } catch (error) {
+      addDebugLog('error', 'Erro ao inserir elemento no grupo via dnd-kit', error);
+    }
+  }, [nodes, setNodes, nodeId, setNodeId, addDebugLog]);
+
   // Função para remover elemento do grupo e criar nó independente
   const handleRemoveChildFromGroup = useCallback((
     event: React.DragEvent,
@@ -647,6 +765,32 @@ export function useFlowLogic() {
     });
   }, [visibleNodes, nodes]);
 
+  useEffect(() => {
+    const onGroupExtract = (ev: any) => {
+      try {
+        const detail = ev?.detail || {};
+        const childNode: Node | undefined = detail.node;
+        const clientX: number | undefined = detail.clientX;
+        const clientY: number | undefined = detail.clientY;
+        if (!childNode) return;
+        if (typeof clientX === 'number' && typeof clientY === 'number') {
+          extractChildToCanvasAtScreenPoint(childNode, { x: clientX, y: clientY });
+        } else {
+          const dom = document.querySelector('.react-flow');
+          const rect = dom?.getBoundingClientRect?.();
+          const fallbackPoint = rect ? { x: rect.left + 20, y: rect.top + 20 } : { x: 100, y: 100 };
+          extractChildToCanvasAtScreenPoint(childNode, fallbackPoint as any);
+        }
+      } catch (e) {
+        addDebugLog('error', 'Erro ao processar extração de filho do grupo', e);
+      }
+    };
+    window.addEventListener('groupExtract', onGroupExtract as any);
+    return () => {
+      window.removeEventListener('groupExtract', onGroupExtract as any);
+    };
+  }, [extractChildToCanvasAtScreenPoint, addDebugLog]);
+
   const processedEdges = useMemo(() => {
     return edges.map(edge => ({
       ...edge,
@@ -684,5 +828,7 @@ export function useFlowLogic() {
     debugLogs,
     addDebugLog,
     addElementAtScreenPoint,
+    extractChildToCanvasAtScreenPoint,
+    addElementToGroupAtScreenPoint,
   };
 }

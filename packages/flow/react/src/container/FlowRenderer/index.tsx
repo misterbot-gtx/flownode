@@ -42,6 +42,8 @@ function FlowRendererComponent<NodeType extends Node = Node>({
   onPaneMouseLeave,
   onPaneContextMenu,
   onPaneScroll,
+  onDragOver,
+  onDrop,
   paneClickDistance,
   deleteKeyCode,
   selectionKeyCode,
@@ -115,6 +117,8 @@ function FlowRendererComponent<NodeType extends Node = Node>({
         onPaneMouseLeave={onPaneMouseLeave}
         onPaneContextMenu={onPaneContextMenu}
         onPaneScroll={onPaneScroll}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         panOnDrag={panOnDrag}
         isSelecting={!!isSelecting}
         selectionMode={selectionMode}

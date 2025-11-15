@@ -148,6 +148,8 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
     debug,
     onScroll,
     ariaLabelConfig,
+    onDragOver,
+    onDrop,
     ...rest
   }: ReactFlowProps<NodeType, EdgeType>,
   ref: ForwardedRef<HTMLDivElement>
@@ -187,7 +189,7 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
         nodeOrigin={nodeOrigin}
         nodeExtent={nodeExtent}
       >
-        <GraphView<NodeType, EdgeType>
+      <GraphView<NodeType, EdgeType>
           onInit={onInit}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
@@ -228,6 +230,8 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
           onPaneMouseLeave={onPaneMouseLeave}
           onPaneScroll={onPaneScroll}
           onPaneContextMenu={onPaneContextMenu}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           paneClickDistance={paneClickDistance}
           nodeClickDistance={nodeClickDistance}
           onSelectionContextMenu={onSelectionContextMenu}

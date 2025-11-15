@@ -86,6 +86,8 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
   onPaneMouseLeave,
   onPaneScroll,
   onPaneContextMenu,
+  onDragOver,
+  onDrop,
   paneClickDistance,
   nodeClickDistance,
   onEdgeContextMenu,
@@ -120,6 +122,8 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
       onPaneMouseLeave={onPaneMouseLeave}
       onPaneContextMenu={onPaneContextMenu}
       onPaneScroll={onPaneScroll}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       paneClickDistance={paneClickDistance}
       deleteKeyCode={deleteKeyCode}
       selectionKeyCode={selectionKeyCode}

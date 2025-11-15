@@ -15,7 +15,7 @@ interface GroupNodeWithDndKitProps {
   isDragging: boolean;
   onDragStart: (node: Node) => void;
   onDragEnd: () => void;
-  onDrop: (active: Node, overId?: string, index?: number) => void;
+  onDrop: (active: Node, overId?: string, index?: number, event?: DragEndEvent) => void;
 }
 
 export const GroupNodeWithDndKit = ({
@@ -50,14 +50,14 @@ export const GroupNodeWithDndKit = ({
     if (!over) {
       // soltou fora do grupo → extrair para o canvas
       const node = localChildNodes.find((n) => n.id === active.id);
-      if (node) onDrop(node);
+      if (node) onDrop(node, undefined, undefined, event);
       return;
     }
     // soltou dentro do grupo → reordenar (opcional)
     const overId = over.id as string;
     const overIndex = localChildNodes.findIndex((n) => n.id === overId);
     const node = localChildNodes.find((n) => n.id === active.id);
-    if (node && overIndex !== -1) onDrop(node, overId, overIndex);
+    if (node && overIndex !== -1) onDrop(node, overId, overIndex, event);
   };
 
   const activeNode = activeId ? localChildNodes.find((n) => n.id === activeId) : null;

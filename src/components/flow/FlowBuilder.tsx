@@ -11,7 +11,7 @@ import '@flow/react/dist/style.css';
 import { FlowSidebar } from './FlowSidebar';
 import { useFlowLogic } from './useFlowLogic';
 import React, { useRef, useState } from 'react';
-import { DndContext, DragStartEvent, DragEndEvent, PointerSensor, useSensor, useSensors, useDroppable, DragOverlay } from '@dnd-kit/core';
+import { DndContext, DragStartEvent, DragEndEvent, DragMoveEvent, PointerSensor, useSensor, useSensors, useDroppable, DragOverlay } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { DebugPanel } from './DebugPanel';
 import { PerformanceMonitor } from './PerformanceMonitor';
@@ -23,6 +23,9 @@ export function FlowBuilder() {
   const { setNodeRef } = useDroppable({ id: 'flow-canvas' });
   const [activeElement, setActiveElement] = useState<any | null>(null);
   const [overlayTilt, setOverlayTilt] = useState(false);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerMoveHandlerRef = useRef<(ev: PointerEvent) => void>();
+  const lastOverGroupRef = useRef<string | null>(null);
 
   // Handler customizado para wheel/scroll
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -87,22 +90,79 @@ export function FlowBuilder() {
       window.dispatchEvent(ev);
       setOverlayTilt(false);
       setTimeout(() => setOverlayTilt(true), 10);
+
+      pointerMoveHandlerRef.current = (pev: PointerEvent) => {
+        lastPointerRef.current = { x: pev.clientX, y: pev.clientY };
+      };
+      window.addEventListener('pointermove', pointerMoveHandlerRef.current, { passive: true });
     }
   };
   const handleDndEnd = (e: DragEndEvent) => {
-    const element = (e.active?.data?.current as any)?.element;
+    const activeData = (e.active?.data?.current as any) || {};
+    const element = activeData.element;
     const ev = (e as any).event as MouseEvent | PointerEvent | TouchEvent;
-    if (element && e.over?.id === 'flow-canvas' && 'clientX' in ev && 'clientY' in ev) {
-      flow.addElementAtScreenPoint(element, { x: (ev as any).clientX, y: (ev as any).clientY });
+    let screenPoint: { x: number; y: number } | null = null;
+    if (ev && 'clientX' in ev && 'clientY' in ev) {
+      screenPoint = { x: (ev as any).clientX, y: (ev as any).clientY };
+    } else if (lastPointerRef.current) {
+      screenPoint = lastPointerRef.current;
+    }
+    if (screenPoint) {
+      const bounds = containerRef.current?.getBoundingClientRect();
+      const insideCanvas = bounds
+        ? screenPoint.x >= bounds.left && screenPoint.x <= bounds.right && screenPoint.y >= bounds.top && screenPoint.y <= bounds.bottom
+        : false;
+      const isGroupTarget = typeof e.over?.id === 'string' && (e.over.id as any).startsWith('group-');
+      const canDrop = e.over?.id === 'flow-canvas' || insideCanvas || isGroupTarget;
+      if (canDrop) {
+      if (element) {
+        if (isGroupTarget) {
+          const groupId = e.over!.id as string;
+          flow.addElementToGroupAtScreenPoint(element, groupId, screenPoint);
+          const leaveEvt = new CustomEvent('groupDndPreviewLeave', { detail: { groupId } });
+          window.dispatchEvent(leaveEvt);
+        } else {
+          flow.addElementAtScreenPoint(element, screenPoint);
+        }
+      } else if (activeData.type === 'group-child' && activeData.node) {
+        flow.extractChildToCanvasAtScreenPoint(activeData.node, screenPoint);
+      }
+      }
     }
     setActiveElement(null);
     const cleanupEv = new CustomEvent('sidebarDragEnd', { detail: { id: e.active?.id } });
     window.dispatchEvent(cleanupEv);
     setOverlayTilt(false);
+    if (pointerMoveHandlerRef.current) {
+      window.removeEventListener('pointermove', pointerMoveHandlerRef.current);
+      pointerMoveHandlerRef.current = undefined;
+    }
+    lastPointerRef.current = null;
+  };
+
+  const handleDndMove = (e: DragMoveEvent) => {
+    const ev = (e as any).event as MouseEvent | PointerEvent | TouchEvent;
+    let screenPoint: { x: number; y: number } | null = null;
+    if (ev && 'clientX' in ev && 'clientY' in ev) {
+      screenPoint = { x: (ev as any).clientX, y: (ev as any).clientY };
+    } else if (lastPointerRef.current) {
+      screenPoint = lastPointerRef.current;
+    }
+    const overId = (e.over?.id as any) as string | undefined;
+    const isGroupTarget = typeof overId === 'string' && overId.startsWith('group-');
+    if (screenPoint && isGroupTarget) {
+      const evt = new CustomEvent('groupDndPreview', { detail: { groupId: overId, clientX: screenPoint.x, clientY: screenPoint.y } });
+      window.dispatchEvent(evt);
+      lastOverGroupRef.current = overId;
+    } else if (lastOverGroupRef.current) {
+      const leaveEvt = new CustomEvent('groupDndPreviewLeave', { detail: { groupId: lastOverGroupRef.current } });
+      window.dispatchEvent(leaveEvt);
+      lastOverGroupRef.current = null;
+    }
   };
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDndStart} onDragEnd={handleDndEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDndStart} onDragMove={handleDndMove} onDragEnd={handleDndEnd}>
       <div className="flex h-screen bg-flow-canvas">
         <FlowSidebar />
         <div
@@ -133,6 +193,8 @@ export function FlowBuilder() {
           nodeTypes={flow.nodeTypes}
           edgeTypes={flow.edgeTypes}
           onEdgeClick={flow.onEdgeClick}
+          onDrop={flow.onDrop}
+          onDragOver={flow.onDragOver}
           onNodeDragStart={() => {
             const ev = new CustomEvent('forceSidebarPreviewCleanup');
             window.dispatchEvent(ev);

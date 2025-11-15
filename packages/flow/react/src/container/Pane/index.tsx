@@ -39,6 +39,8 @@ type PaneProps = {
     | 'onPaneMouseMove'
     | 'onPaneMouseLeave'
     | 'selectionOnDrag'
+    | 'onDragOver'
+    | 'onDrop'
   >
 >;
 
@@ -75,6 +77,8 @@ export function Pane({
   onPaneMouseEnter,
   onPaneMouseMove,
   onPaneMouseLeave,
+  onDragOver,
+  onDrop,
   children,
 }: PaneProps) {
   const store = useStoreApi();
@@ -293,6 +297,8 @@ export function Pane({
       onPointerDownCapture={hasActiveSelection ? onPointerDownCapture : undefined}
       onClickCapture={hasActiveSelection ? onClickCapture : undefined}
       onPointerLeave={onPaneMouseLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       ref={container}
       style={containerStyle}
     >

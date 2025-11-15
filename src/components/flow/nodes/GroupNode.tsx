@@ -1,4 +1,5 @@
 import { memo, useState, useEffect, useRef } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import { Handle, Position, NodeProps, Node, useSidebarDragPreview } from '@flow/react';
 import { Edit3, Plus, Settings } from 'lucide-react';
 import { Box, Flex, Text, Input } from '@chakra-ui/react';
@@ -131,6 +132,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const previousDragOverIndexRef = useRef<number>(-1); // Para comparar índices
   // NOVO: Armazenar a calculatedPosition para posicionamento exato
   const [calculatedPosition, setCalculatedPosition] = useState<{ x: number, y: number } | null>(null);
+  const { setNodeRef } = useDroppable({ id });
 
   // Usar ref para armazenar o timestamp da última atualização
   const lastUpdateRef = useRef<number>((groupData as any)._updateTimestamp || 0);
@@ -164,6 +166,10 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
+    const onSidebarDragStart = () => setIsDragging(true);
+    const onSidebarDragEnd = () => setIsDragging(false);
+    window.addEventListener('sidebarDragStart', onSidebarDragStart as any);
+    window.addEventListener('sidebarDragEnd', onSidebarDragEnd as any);
     const onChildNodeDragStart = (ev: any) => {
       const detail = ev?.detail || {};
       if (detail.childNodeId) {
@@ -185,6 +191,8 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     return () => {
       window.removeEventListener('dragstart', handleDragStart);
       window.removeEventListener('dragend', handleDragEnd);
+      window.removeEventListener('sidebarDragStart', onSidebarDragStart as any);
+      window.removeEventListener('sidebarDragEnd', onSidebarDragEnd as any);
       window.removeEventListener('childNodeDragStart', onChildNodeDragStart as any);
     };
   }, []);
@@ -274,6 +282,56 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
 
     setDragOverIndex(newIndex);
   };
+
+  useEffect(() => {
+    const onGroupPreview = (ev: any) => {
+      const detail = ev?.detail || {};
+      if (detail.groupId !== id) return;
+      setIsDragOver(true);
+      if (!isPreviewStable) {
+        setIsPreviewMode(true);
+        setIsPreviewStable(true);
+      }
+      const rect = dragRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mouseXInGroup = detail.clientX - rect.left;
+      const mouseYInGroup = detail.clientY - rect.top;
+      const previewPosition = {
+        x: Math.max(16, Math.min(mouseXInGroup, rect.width - 180)),
+        y: Math.max(80, Math.min(mouseYInGroup, rect.height - 80))
+      };
+      const currentPos = calculatedPosition;
+      if (!currentPos || Math.abs(currentPos.x - previewPosition.x) > 5 || Math.abs(currentPos.y - previewPosition.y) > 5) {
+        setCalculatedPosition(previewPosition);
+      }
+      let newIndex = 0;
+      if (localChildNodes.length > 0) {
+        const offsetY = detail.clientY - rect.top;
+        const itemHeight = 88;
+        newIndex = Math.floor((offsetY - 80) / itemHeight);
+        newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
+      }
+      if (newIndex !== previousDragOverIndexRef.current) {
+        previousDragOverIndexRef.current = newIndex;
+      }
+      setDragOverIndex(newIndex);
+    };
+    const onGroupPreviewLeave = (ev: any) => {
+      const detail = ev?.detail || {};
+      if (detail.groupId !== id) return;
+      setIsDragOver(false);
+      setDragOverIndex(-1);
+      setIsPreviewMode(false);
+      setIsPreviewStable(false);
+      previousDragOverIndexRef.current = -1;
+    };
+    window.addEventListener('groupDndPreview', onGroupPreview as any);
+    window.addEventListener('groupDndPreviewLeave', onGroupPreviewLeave as any);
+    return () => {
+      window.removeEventListener('groupDndPreview', onGroupPreview as any);
+      window.removeEventListener('groupDndPreviewLeave', onGroupPreviewLeave as any);
+    };
+  }, [id, localChildNodes, isPreviewStable, calculatedPosition]);
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
@@ -490,7 +548,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         </Flex>
       </Flex>
 
-      <Box ref={dragRef as any} className={`${isDragOver ? 'view' : 'view'} nodrag`}>
+      <Box ref={(el) => { (dragRef as any).current = el; setNodeRef(el as any); }} className={`${isDragOver ? 'view' : 'view'} nodrag`}>
         {localChildNodes && localChildNodes.length > 0 ? (
           <GroupNodeWithDndKit
             localChildNodes={localChildNodes}
@@ -506,11 +564,14 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
               setDraggedChildId(null);
               setIsDragging(false);
             }}
-            onDrop={(active, overId, index) => {
+            onDrop={(active, overId, index, evt) => {
               if (!overId) {
                 // soltou fora do grupo → extrair para o canvas
+                const nativeEv = (evt as any)?.event as MouseEvent | PointerEvent | TouchEvent | undefined;
+                const clientX = nativeEv && 'clientX' in nativeEv ? (nativeEv as any).clientX : undefined;
+                const clientY = nativeEv && 'clientY' in nativeEv ? (nativeEv as any).clientY : undefined;
                 const customEvent = new CustomEvent('groupExtract', {
-                  detail: { groupId: id, node: active },
+                  detail: { groupId: id, node: active, clientX, clientY },
                 });
                 window.dispatchEvent(customEvent);
                 // remove da lista local

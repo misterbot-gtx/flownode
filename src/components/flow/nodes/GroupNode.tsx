@@ -169,7 +169,6 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         draggedChildNodeRef.current = detail.nodeData as Node;
         setIsPreviewMode(true);
         setIsPreviewStable(true);
-        setLocalChildNodes((prev) => prev.filter((n) => n.id !== detail.childNodeId));
       }
     };
     window.addEventListener('childNodeDragStart', onChildNodeDragStart as any);
@@ -285,9 +284,10 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         
         if (isChildNode) {
           console.log(`❌ Nó filho '${draggedNodeId}' saiu do foco do grupo '${title}'`);
-          // Remove imediatamente o child da visão do grupo
-          setLocalChildNodes((prev) => prev.filter((n) => n.id !== draggedNodeId));
-          // Emite evento opcional de remoção visual
+          // NÃO removemos o child da lista local aqui.
+          // Mantemos apenas oculto via 'hidden' enquanto o drag estiver ativo,
+          // evitando que o elemento desapareça caso o drop ocorra fora do grupo
+          // e falhe por qualquer motivo.
           const removedEv = new CustomEvent('childNodeViewRemoved', {
             detail: { groupId: id, childNodeId: draggedNodeId }
           });
@@ -419,7 +419,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         transition-all duration-200 hover:shadow-lg
         ${selected ? 'border-primary shadow-lg shadow-primary/20' : 'border-border/30 hover:border-border/50'}
         ${isHovered ? 'shadow-md' : ''}
-        ${isDragOver ? 'border-primary bg-primary/20 shadow-2xl shadow-primary/30 z-20' : ''}
+        ${isDragOver ? 'border-primary shadow-2xl shadow-primary/30 z-20' : ''}
       `}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -494,9 +494,21 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
                 isActive = false;
               }
               return (
-                <div key={childNode.id + '-' + index} className="view-child">
-                  <GroupChildNode node={childNode} index={index} isDragOver={false} hidden={draggedChildId === childNode.id} />
-                  <DividerWithHover isDragging={isDragging} isActive={isActive} />
+                <div
+                  key={childNode.id + '-' + index}
+                  className={`view-child ${draggedChildId === childNode.id ? 'no-space' : ''}`}
+                >
+                  <GroupChildNode
+                    node={childNode}
+                    index={index}
+                    isDragOver={false}
+                    hidden={draggedChildId === childNode.id}
+                  />
+                  <DividerWithHover
+                    isDragging={isDragging}
+                    isActive={isActive}
+                    extraClass={draggedChildId === childNode.id ? 'close' : ''}
+                  />
                 </div>
               );
             })}
@@ -531,13 +543,15 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
 function DividerWithHover({
   isDragging,
   isActive,
+  extraClass,
 }: {
   isDragging: boolean;
   isActive: boolean;
+  extraClass?: string;
 }) {
   return (
     <div
-      className={`view-divider ${isActive && isDragging ? 'active' : ''}`}
+      className={`view-divider ${isActive && isDragging ? 'active' : ''} ${extraClass || ''}`}
     />
   );
 }

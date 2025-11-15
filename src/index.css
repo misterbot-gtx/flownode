@@ -146,8 +146,9 @@ All colors MUST be HSL.
 .react-flow__minimap-svg {
   border-radius: 10px;
 }
+
 .react-flow__minimap-mask {
-    display: none;
+  display: none;
 }
 
 .react-flow__controls {
@@ -258,6 +259,15 @@ All colors MUST be HSL.
 
 .view-child:last-child {
   margin-bottom: 0;
+}
+
+/* Remover apenas o espaço reservado sem afetar o drag element */
+.view-divider.close {
+  display: none;
+}
+
+.view-child.no-space {
+  margin-bottom: 0 !important;
 }
 
 /* Estados especiais para dividers */

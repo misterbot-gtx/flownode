@@ -1,16 +1,14 @@
-Eu quero fazer o seguite quero que na depedencia faça o seguite eu crie um grupo que eu coloco elementos nele no meu codigo e a depedencia atual do flow
- quando eu tento arrasta o elemento para fora não funcionana eu não quero usar o sistema nativo de subflow do react flow e sim criar uma logica para os
- elementos detro do grupo quando tentado arrasta para fora é retirado do grupo que no caso ele é um nó unico ou seja quero que para cada elemento dentro
- desse no tenha sua mobilidade como o do typebot.
+Versão do projeto no GITHUB: v13
 
-Eu quero que faça o seguite para evitar esse problema eu tinha inicialmente criado essa logica de preview persolaizado para subistituir o o preview padrão do reactflow pois
-ele não cria o elemento real e sim é um dragdrop fake e eu quero que essa logica minha de preview coloque na depedencia diretamente e tire ela nativa do meu codigo
-deixando ela na depedencia e no front poder modificar o elemento preview.
+1. Melhorias a serem feitas ao inves de utilização do tailwind utilizar a tecnologia chakra-ui para a estilização
+    dos componetes do nó do grupo.
 
-Eu quero que corrija a logica de quando que eu mecher nos nós ele aparece isso no caso o valor de quando ele é solto do flow e eu não quero isso só quando
-for tentar tirar o nó do bloco filho do grupo criado.
+2. Correção da logica de de dragdrop do elemento do nó do grupo pois quando e retirado o nó e colocado ele no flow
+    não acontece nada e deveria aparecer o nó do elemento retirado do grupo.
 
-"dev": "concurrently \"rollup --config node:@flow/rollup-config --watch\" pnpm:css-watch",
+3. Criar a logica para quando tira o elemento do grupo poder colocar ele novamente ou seja a mesma logica do sidebar
+    como se o elemento fosse tirado do sidebar que quando passa o mouse em cima do grupo aprece o view onde ele poderar
+    ocupar no espaço.
 
 
 pnpm i

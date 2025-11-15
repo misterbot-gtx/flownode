@@ -513,10 +513,15 @@ export function useFlowLogic() {
         const groupChildNodes = nds.filter(n => n.parentId === targetGroup.id);
 
         let insertIndex = groupChildNodes.length;
-        if (groupChildNodes.length > 0) {
-          const itemHeight = 88;
-          const yRel = relY - 80;
-          insertIndex = Math.max(0, Math.min(Math.floor(yRel / itemHeight), groupChildNodes.length));
+        const container = document.querySelector(`.react-flow__node[data-id="${targetGroup.id}"] .view`) as HTMLElement | null;
+        if (container) {
+          const childrenEls = Array.from(container.querySelectorAll('.view-child')).filter((el) => !el.classList.contains('no-space')) as HTMLElement[];
+          for (let i = 0; i < childrenEls.length; i++) {
+            const r = childrenEls[i].getBoundingClientRect();
+            const mid = r.top + r.height / 2;
+            if (screenPoint.y < mid) { insertIndex = i; break; }
+            insertIndex = i + 1;
+          }
         }
 
         const childrenToInsert = [...groupChildNodes];

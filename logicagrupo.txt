@@ -1,14 +1,8 @@
 Versão do projeto no GITHUB: v13
 
-1. Melhorias a serem feitas ao inves de utilização do tailwind utilizar a tecnologia chakra-ui para a estilização
-    dos componetes do nó do grupo.
+1. Eu quero que melhore a logica quando for tirar o elemento do grupo quero que ele fique a onde  a pessoa soltou o elemento no flowbuider.
 
-2. Correção da logica de de dragdrop do elemento do nó do grupo pois quando e retirado o nó e colocado ele no flow
-    não acontece nada e deveria aparecer o nó do elemento retirado do grupo.
-
-3. Criar a logica para quando tira o elemento do grupo poder colocar ele novamente ou seja a mesma logica do sidebar
-    como se o elemento fosse tirado do sidebar que quando passa o mouse em cima do grupo aprece o view onde ele poderar
-    ocupar no espaço.
+2. Eu quero que quando tirar o elemento do grupo quero que mostre o preview onde ele pode ocupar na grupo caso a pessoa queira mudar a possição do item.
 
 
 pnpm i

@@ -265,13 +265,13 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
       console.log('🎯 CALCULATED POSITION ATUALIZADA:', previewPosition);
     }
 
-    // Calcular índice de drop baseado na posição Y
+    const childrenEls = Array.from(dragRef.current?.querySelectorAll('.view-child') || []).filter((el) => !el.classList.contains('no-space')) as HTMLElement[];
     let newIndex = 0;
-    if (localChildNodes.length > 0) {
-      const offsetY = e.clientY - groupRect.top;
-      const itemHeight = 88; // altura padrão dos componentes
-      newIndex = Math.floor((offsetY - 80) / itemHeight);
-      newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
+    for (let i = 0; i < childrenEls.length; i++) {
+      const r = childrenEls[i].getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (e.clientY < mid) { newIndex = i; break; }
+      newIndex = i + 1;
     }
 
     // Atualizar dragOverIndex se mudou
@@ -300,16 +300,14 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         x: Math.max(16, Math.min(mouseXInGroup, rect.width - 180)),
         y: Math.max(80, Math.min(mouseYInGroup, rect.height - 80))
       };
-      const currentPos = calculatedPosition;
-      if (!currentPos || Math.abs(currentPos.x - previewPosition.x) > 5 || Math.abs(currentPos.y - previewPosition.y) > 5) {
-        setCalculatedPosition(previewPosition);
-      }
+      setCalculatedPosition(previewPosition);
+      const childrenEls = Array.from(dragRef.current?.querySelectorAll('.view-child') || []).filter((el) => !el.classList.contains('no-space')) as HTMLElement[];
       let newIndex = 0;
-      if (localChildNodes.length > 0) {
-        const offsetY = detail.clientY - rect.top;
-        const itemHeight = 88;
-        newIndex = Math.floor((offsetY - 80) / itemHeight);
-        newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
+      for (let i = 0; i < childrenEls.length; i++) {
+        const r = childrenEls[i].getBoundingClientRect();
+        const mid = r.top + r.height / 2;
+        if (detail.clientY < mid) { newIndex = i; break; }
+        newIndex = i + 1;
       }
       if (newIndex !== previousDragOverIndexRef.current) {
         previousDragOverIndexRef.current = newIndex;

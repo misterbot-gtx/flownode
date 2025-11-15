@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ELEMENT_CATEGORIES } from '@/data/flowElements';
-import { CategorySection, useSidebarDrag } from './useSidebarDrag';
+import { CategorySection, useSidebarDrag, useSidebarDraggingIdSync } from './useSidebarDrag';
 
 interface FlowSidebarProps {
   className?: string;
@@ -9,6 +9,7 @@ interface FlowSidebarProps {
 
 export function FlowSidebar({ className }: FlowSidebarProps) {
   const { searchTerm, setSearchTerm, draggingElementId, setDraggingElementId, handleSidebarDrop } = useSidebarDrag();
+  useSidebarDraggingIdSync(setDraggingElementId);
 
   return (
     <div

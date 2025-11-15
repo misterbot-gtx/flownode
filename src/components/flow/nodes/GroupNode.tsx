@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, Node, useSidebarDragPreview } from '@flow/react';
 import { Edit3, Plus, Settings } from 'lucide-react';
 import { Box, Flex, Text, Input } from '@chakra-ui/react';
+import { GroupNodeWithDndKit } from '@/components/flow/dndkit/GroupNodeWithDndKit';
 
 interface GroupNodeData {
   title: string;
@@ -46,7 +47,7 @@ const GroupChildNode = memo(
       e.dataTransfer.setData('application/reactflow-child', node.id);
       e.dataTransfer.setData('application/reactflow-child-node-data', JSON.stringify(node));
       e.dataTransfer.effectAllowed = 'move';
-      
+
       const invisibleImg = document.createElement('div');
       invisibleImg.style.width = '1px';
       invisibleImg.style.height = '1px';
@@ -59,9 +60,9 @@ const GroupChildNode = memo(
         icon: nodeData.element?.icon || '📄',
         label: nodeData.label,
       });
-      
+
       console.log(`🚀 Iniciando arrasto do elemento "${nodeData.label}" (${node.id}) para fora do grupo`);
-      
+
       // Dispara evento global para notificar que um elemento do grupo está sendo arrastado
       const dragStartEvent = new CustomEvent('childNodeDragStart', {
         detail: {
@@ -86,14 +87,13 @@ const GroupChildNode = memo(
         transition="all 0.2s"
         boxShadow={isDragOver ? 'lg' : 'none'}
         opacity={0.9}
-        className="nodrag"
+        className={`nodrag ${hidden ? 'dragging-hidden' : ''}`}
         draggable
         onDragStart={handleDragStart}
         onDragEnd={(e) => {
           console.log(`✅ Arrasto do elemento "${nodeData.label}" (${node.id}) finalizado`);
           stopPreview();
         }}
-        style={{ visibility: hidden ? 'hidden' : 'visible' }}
       >
         <Flex align="center" gap="2" mb="2">
           <Text fontSize="sm">{nodeData.element?.icon}</Text>
@@ -130,8 +130,8 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const draggedChildNodeRef = useRef<Node | null>(null);
   const previousDragOverIndexRef = useRef<number>(-1); // Para comparar índices
   // NOVO: Armazenar a calculatedPosition para posicionamento exato
-  const [calculatedPosition, setCalculatedPosition] = useState<{x: number, y: number} | null>(null);
-  
+  const [calculatedPosition, setCalculatedPosition] = useState<{ x: number, y: number } | null>(null);
+
   // Usar ref para armazenar o timestamp da última atualização
   const lastUpdateRef = useRef<number>((groupData as any)._updateTimestamp || 0);
 
@@ -139,7 +139,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     // Só atualiza se houver mudanças reais nos filhos e não estiver em modo de preview
     if (!isPreviewMode && groupData.childNodes) {
       const currentTimestamp = (groupData as any)._updateTimestamp || 0;
-      
+
       // Evita atualizações desnecessárias se não houve mudanças significativas
       if (currentTimestamp > lastUpdateRef.current) {
         setLocalChildNodes(groupData.childNodes);
@@ -167,11 +167,18 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
     const onChildNodeDragStart = (ev: any) => {
       const detail = ev?.detail || {};
       if (detail.childNodeId) {
+        // Atualiza o estado, mas adia a renderização visual por 1 frame
+        // para não interferir no arrasto
         setIsDragging(true);
-        setDraggedChildId(detail.childNodeId);
         draggedChildNodeRef.current = detail.nodeData as Node;
         setIsPreviewMode(true);
         setIsPreviewStable(true);
+
+        // Adia a atribuição de draggedChildId por 1 frame
+        setTimeout(() => {
+          setDraggedChildId(detail.childNodeId);
+          console.log(`🎯 Visual do filho "${detail.childNodeId}" será ocultado após estabilização`);
+        }, 0);
       }
     };
     window.addEventListener('childNodeDragStart', onChildNodeDragStart as any);
@@ -219,37 +226,37 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
-    
+
     // LÓGICA DE PREVIEW ESTÁVEL: Só ativa preview se não estiver estável ainda
     if (!isPreviewStable) {
       setIsPreviewMode(true);
       setIsPreviewStable(true);
       console.log('🔒 PREVIEW ESTABILIZADO para grupo:', title);
     }
-    
+
     const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
     const elementData = e.dataTransfer.getData('application/reactflow');
-    
+
     // Calcular a posição exata do preview (calculatedPosition)
     const groupRect = e.currentTarget.getBoundingClientRect();
     const mouseXInGroup = e.clientX - groupRect.left;
     const mouseYInGroup = e.clientY - groupRect.top;
-    
+
     // Calcular posição considerando header e padding
     const previewPosition = {
       x: Math.max(16, Math.min(mouseXInGroup, groupRect.width - 180)),
       y: Math.max(80, Math.min(mouseYInGroup, groupRect.height - 80))
     };
-    
+
     // Atualizar calculatedPosition se mudou significativamente
     const currentPos = calculatedPosition;
     if (!currentPos ||
-        Math.abs(currentPos.x - previewPosition.x) > 5 ||
-        Math.abs(currentPos.y - previewPosition.y) > 5) {
+      Math.abs(currentPos.x - previewPosition.x) > 5 ||
+      Math.abs(currentPos.y - previewPosition.y) > 5) {
       setCalculatedPosition(previewPosition);
       console.log('🎯 CALCULATED POSITION ATUALIZADA:', previewPosition);
     }
-    
+
     // Calcular índice de drop baseado na posição Y
     let newIndex = 0;
     if (localChildNodes.length > 0) {
@@ -258,19 +265,19 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
       newIndex = Math.floor((offsetY - 80) / itemHeight);
       newIndex = Math.max(0, Math.min(newIndex, localChildNodes.length));
     }
-    
+
     // Atualizar dragOverIndex se mudou
     if (newIndex !== previousDragOverIndexRef.current) {
       console.log(`🎯 DropIndex alterado: ${previousDragOverIndexRef.current} → ${newIndex}`);
       previousDragOverIndexRef.current = newIndex;
     }
-    
+
     setDragOverIndex(newIndex);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    
+
     // Verifica se realmente saiu do grupo (não apenas mudou para um divider interno)
     const rect = dragRef.current?.getBoundingClientRect();
     if (rect) {
@@ -279,12 +286,12 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         e.clientX > rect.right ||
         e.clientY < rect.top ||
         e.clientY > rect.bottom;
-      
+
       // Log quando sai do foco do grupo
       if (isLeavingGroup && isDragOver) {
         const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
         const isChildNode = draggedNodeId !== '';
-        
+
         if (isChildNode) {
           console.log(`❌ Nó filho '${draggedNodeId}' saiu do foco do grupo '${title}'`);
           // NÃO removemos o child da lista local aqui.
@@ -307,7 +314,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
           }
         }
       }
-      
+
       // Só reseta os estados se realmente saiu do grupo
       if (isLeavingGroup) {
         setIsDragOver(false);
@@ -330,28 +337,28 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // RESET DOS ESTADOS DE PREVIEW
     setIsDragOver(false);
     setIsPreviewMode(false);
     setIsPreviewStable(false);
     console.log('🔓 PREVIEW ESTÁVEL RESETADO após DROP no grupo:', title);
     previousDragOverIndexRef.current = -1;
-    
+
     const elementData = e.dataTransfer.getData('application/reactflow');
     if (elementData) {
       // USAR AS COORDENADAS JÁ CALCULADAS DURANTE O PREVIEW
       const finalDropIndex = dragOverIndex >= 0 ? dragOverIndex : 0;
-      
+
       // Usar calculatedPosition direta, sem re-calcular
       const finalPosition = calculatedPosition || { x: 16, y: 120 }; // fallback
-      
+
       console.log('🎯 DROP USANDO CALCULATED POSITION:', {
         calculatedPosition: finalPosition,
         dropIndex: finalDropIndex,
         isConsistent: true
       });
-      
+
       // Dispara evento com dados consistentes do preview
       const customEvent = new CustomEvent('groupDrop', {
         detail: {
@@ -370,14 +377,14 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         },
       });
       window.dispatchEvent(customEvent);
-      
+
       console.log('✅ Evento groupDrop com posição consistente:', {
         groupId: id,
         finalPosition,
         dropIndex: finalDropIndex
       });
     }
-    
+
     // Se for um nó filho sendo movido dentro do grupo
     const draggedNodeId = e.dataTransfer.getData('application/reactflow-child');
     if (draggedNodeId) {
@@ -408,7 +415,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         window.dispatchEvent(customEvent);
       }
     }
-    
+
     // Reset calculatedPosition após drop
     setCalculatedPosition(null);
     setDragOverIndex(-1);
@@ -483,55 +490,45 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
         </Flex>
       </Flex>
 
-      <Box
-        ref={dragRef as any}
-        className={`${isDragOver ? 'view' : 'view'} nodrag`}
-      >
+      <Box ref={dragRef as any} className={`${isDragOver ? 'view' : 'view'} nodrag`}>
         {localChildNodes && localChildNodes.length > 0 ? (
-          <Box className="view-content">
-            {/* Divider no topo */}
-            {(() => {
-              if (localChildNodes.length === 0) return null;
-              let isActive = dragOverIndex === 0;
-              if (
-                draggedChildId &&
-                localChildNodes[0]?.id === draggedChildId &&
-                dragOverIndex === 0
-              ) {
-                isActive = false;
+          <GroupNodeWithDndKit
+            localChildNodes={localChildNodes}
+            draggedChildId={draggedChildId}
+            isDragOver={isDragOver}
+            dragOverIndex={dragOverIndex}
+            isDragging={isDragging}
+            onDragStart={(node) => {
+              setDraggedChildId(node.id);
+              setIsDragging(true);
+            }}
+            onDragEnd={() => {
+              setDraggedChildId(null);
+              setIsDragging(false);
+            }}
+            onDrop={(active, overId, index) => {
+              if (!overId) {
+                // soltou fora do grupo → extrair para o canvas
+                const customEvent = new CustomEvent('groupExtract', {
+                  detail: { groupId: id, node: active },
+                });
+                window.dispatchEvent(customEvent);
+                // remove da lista local
+                setLocalChildNodes((prev) => prev.filter((n) => n.id !== active.id));
+              } else {
+                // soltou dentro do grupo → reordenar
+                setLocalChildNodes((prev) => {
+                  const copy = [...prev];
+                  const from = copy.findIndex((n) => n.id === active.id);
+                  if (from === -1) return prev;
+                  const [removed] = copy.splice(from, 1);
+                  const to = index ?? copy.length;
+                  copy.splice(to, 0, removed);
+                  return copy;
+                });
               }
-              // Se está em dragOver e não há dragOverIndex, manter o divider topo aberto
-              if (isDragOver && dragOverIndex === -1 && localChildNodes.length > 0) {
-                isActive = true;
-              }
-              return <DividerWithHover isDragging={isDragging} isActive={isActive} />;
-            })()}
-            {/* Renderiza filhos e dividers abaixo de cada filho */}
-            {localChildNodes.map((childNode, index) => {
-              let isActive = dragOverIndex === index + 1;
-              if (draggedChildId && childNode.id === draggedChildId && dragOverIndex === index + 1) {
-                isActive = false;
-              }
-              return (
-                <Box
-                  key={childNode.id + '-' + index}
-                  className={`view-child ${draggedChildId === childNode.id ? 'no-space' : ''}`}
-                >
-                  <GroupChildNode
-                    node={childNode}
-                    index={index}
-                    isDragOver={false}
-                    hidden={draggedChildId === childNode.id}
-                  />
-                  <DividerWithHover
-                    isDragging={isDragging}
-                    isActive={isActive}
-                    extraClass={draggedChildId === childNode.id ? 'close' : ''}
-                  />
-                </Box>
-              );
-            })}
-          </Box>
+            }}
+          />
         ) : (
           <Flex align="center" justify="center" color="hsl(var(--muted-foreground))" fontSize="sm" py="4" mt="2" mb="2">
             <Box textAlign="center">
@@ -559,7 +556,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   );
 });
 
-function DividerWithHover({
+export function DividerWithHover({
   isDragging,
   isActive,
   extraClass,

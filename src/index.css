@@ -297,6 +297,14 @@ All colors MUST be HSL.
   margin: 0.125rem 0;
 }
 
+.view-divider.disable {
+  height: 5px;
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.2);
+  margin: 8px 0px;
+}
+
 .view-divider.active {
   height: 67px;
   background: hsl(var(--primary) / 0.3);
@@ -320,4 +328,19 @@ All colors MUST be HSL.
 
 .view-enter {
   animation: viewSlideIn 0.3s ease-out;
+}
+
+.dragging-hidden {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+}
+
+.dragging-hidden > * {
+  display: none !important;
 }

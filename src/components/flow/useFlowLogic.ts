@@ -379,6 +379,49 @@ export function useFlowLogic() {
     }
   }, [nodeId, groupId, setNodes, setNodeId, setGroupId, addDebugLog]);
 
+  const addElementAtScreenPoint = useCallback((element: FlowElement, screenPoint: { x: number; y: number }) => {
+    try {
+      let dropPosition;
+      if (reactFlowRef.current) {
+        const reactFlowInstance = reactFlowRef.current;
+        dropPosition = reactFlowInstance.screenToFlowPosition({ x: screenPoint.x, y: screenPoint.y });
+      } else {
+        dropPosition = { x: screenPoint.x, y: screenPoint.y } as any;
+      }
+      const newGroup: Node = {
+        id: `group-${groupId}`,
+        type: 'groupNode',
+        position: { x: dropPosition.x - 150, y: dropPosition.y - 80 },
+        data: { title: `Group #${groupId}`, nodes: [] },
+      };
+      const elementType = (element.type || '').toLowerCase();
+      const { width, height } = NODE_SIZES[elementType] || NODE_SIZES['default'];
+      const componentPosition = { x: newGroup.position.x + 16, y: newGroup.position.y + 80 };
+      const typeMap: Record<string, string> = { start: 'startNode', texto: 'textNode', imagem: 'imageNode', audio: 'audioNode' };
+      const nodeType = typeMap[elementType] || 'textNode';
+      const newNode: Node = {
+        id: `${element.type}-${nodeId}`,
+        type: nodeType,
+        position: componentPosition,
+        data: { label: element.label, element, width, height, tempHeightZero: true },
+        parentId: newGroup.id,
+      };
+      setNodes((nds) => {
+        const newNodes = [...nds, newGroup, newNode];
+        addDebugLog('success', 'Grupo e componente criados via dnd-kit', {
+          group: { id: newGroup.id, title: newGroup.data.title },
+          component: { id: newNode.id, type: newNode.type },
+        });
+        return newNodes;
+      });
+      setNodeId((id) => id + 1);
+      setGroupId((id) => id + 1);
+    } catch (error) {
+      console.error('Erro ao adicionar elemento via dnd-kit:', error);
+      addDebugLog('error', 'Erro ao adicionar elemento via dnd-kit', error);
+    }
+  }, [nodeId, groupId, setNodes, setNodeId, setGroupId, addDebugLog]);
+
   // Função para remover elemento do grupo e criar nó independente
   const handleRemoveChildFromGroup = useCallback((
     event: React.DragEvent,
@@ -476,6 +519,7 @@ export function useFlowLogic() {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
       const elementData =
         event.dataTransfer.getData('application/reactflow') ||
@@ -639,5 +683,6 @@ export function useFlowLogic() {
     reactFlowRef, // exporta a ref
     debugLogs,
     addDebugLog,
+    addElementAtScreenPoint,
   };
 }

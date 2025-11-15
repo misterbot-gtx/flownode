@@ -11,12 +11,18 @@ import '@flow/react/dist/style.css';
 import { FlowSidebar } from './FlowSidebar';
 import { useFlowLogic } from './useFlowLogic';
 import React, { useRef, useState } from 'react';
+import { DndContext, DragStartEvent, DragEndEvent, PointerSensor, useSensor, useSensors, useDroppable, DragOverlay } from '@dnd-kit/core';
+import { createPortal } from 'react-dom';
 import { DebugPanel } from './DebugPanel';
 import { PerformanceMonitor } from './PerformanceMonitor';
 
 export function FlowBuilder() {
   const flow = useFlowLogic();
   const containerRef = useRef<HTMLDivElement>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const { setNodeRef } = useDroppable({ id: 'flow-canvas' });
+  const [activeElement, setActiveElement] = useState<any | null>(null);
+  const [overlayTilt, setOverlayTilt] = useState(false);
 
   // Handler customizado para wheel/scroll
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -73,22 +79,42 @@ export function FlowBuilder() {
     window.dispatchEvent(ev);
   };
 
+  const handleDndStart = (e: DragStartEvent) => {
+    const element = (e.active?.data?.current as any)?.element;
+    if (element) {
+      setActiveElement(element);
+      const ev = new CustomEvent('sidebarDragStart', { detail: { id: e.active.id } });
+      window.dispatchEvent(ev);
+      setOverlayTilt(false);
+      setTimeout(() => setOverlayTilt(true), 10);
+    }
+  };
+  const handleDndEnd = (e: DragEndEvent) => {
+    const element = (e.active?.data?.current as any)?.element;
+    const ev = (e as any).event as MouseEvent | PointerEvent | TouchEvent;
+    if (element && e.over?.id === 'flow-canvas' && 'clientX' in ev && 'clientY' in ev) {
+      flow.addElementAtScreenPoint(element, { x: (ev as any).clientX, y: (ev as any).clientY });
+    }
+    setActiveElement(null);
+    const cleanupEv = new CustomEvent('sidebarDragEnd', { detail: { id: e.active?.id } });
+    window.dispatchEvent(cleanupEv);
+    setOverlayTilt(false);
+  };
+
   return (
-    <div className="flex h-screen bg-flow-canvas">
-      <FlowSidebar />
-      <div
-        className="flex-1 relative"
-        ref={containerRef}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDownCanvas}
-        onDragStart={handleDragStart}
-        onDrop={(ev) => {
-          flow.onDrop(ev);
-          const cleanupEv = new CustomEvent('forceSidebarPreviewCleanup');
-          window.dispatchEvent(cleanupEv);
-        }}
-        onDragOver={flow.onDragOver}
-      >
+    <DndContext sensors={sensors} onDragStart={handleDndStart} onDragEnd={handleDndEnd}>
+      <div className="flex h-screen bg-flow-canvas">
+        <FlowSidebar />
+        <div
+          className="flex-1 relative"
+          ref={(el) => {
+            containerRef.current = el as any;
+            setNodeRef(el as any);
+          }}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDownCanvas}
+          onDragStart={handleDragStart}
+        >
         {/* Toolbar */}
         <div className="absolute top-4 left-4 z-10 flex gap-2">
           <button
@@ -157,7 +183,32 @@ export function FlowBuilder() {
             }
           }}
         />
+        </div>
       </div>
-    </div>
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <DragOverlay>
+              {activeElement ? (
+                <div
+                  className={`dragging-previews ${overlayTilt ? 'tilt' : ''}`}
+                  style={{
+                    width: '18rem',
+                    border: '3px solid #ea580c',
+                    background: 'rgb(24 24 27)',
+                    borderRadius: 8,
+                    padding: '7.5px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <span style={{ fontSize: '1.5rem' }}>{activeElement.icon}</span>
+                  <span style={{ fontSize: '1rem', color: 'white', marginLeft: 8 }}>{activeElement.label}</span>
+                </div>
+              ) : null}
+            </DragOverlay>,
+            document.body
+          )
+        : null}
+    </DndContext>
   );
 }

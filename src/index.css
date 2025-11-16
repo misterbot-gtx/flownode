@@ -268,10 +268,14 @@ All colors MUST be HSL.
   gap: 0.625rem;
   /* Espaçamento intermediate no hover */
 }
+.view-child.disable {
+  margin-bottom: 0;
+  height: 0;
+}
 
 /* Elementos filhos com espaçamento melhorado */
 .view-child {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0rem;
   transition: all 0.2s ease-in-out;
 }
 

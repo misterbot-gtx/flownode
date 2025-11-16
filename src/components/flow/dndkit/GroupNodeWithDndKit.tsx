@@ -36,6 +36,7 @@ export const GroupNodeWithDndKit = ({
   const dragStartInfoRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const [overlaySize, setOverlaySize] = useState<{ width: number; height: number } | null>(null);
   const [projectedIndex, setProjectedIndex] = useState<number | null>(null);
+  const [placeholderStage, setPlaceholderStage] = useState<'close' | 'active' | 'disabled' | null>(null);
 
   const EXTRACT_MIN_DISTANCE = 24; // distância mínima para considerar extração
   const EXTRACT_PRESS_DELAY = 180; // ms de press delay para considerar extração
@@ -193,6 +194,7 @@ export const GroupNodeWithDndKit = ({
     const { active, over } = event;
     if (!active || !over) {
       setProjectedIndex(null);
+      setPlaceholderStage(null);
       return;
     }
     const overIndex = localChildNodes.findIndex((n) => n.id === (over.id as string));
@@ -201,8 +203,11 @@ export const GroupNodeWithDndKit = ({
       const idx = activeIndex < overIndex ? overIndex + 1 : overIndex;
       const clamped = Math.max(0, Math.min(idx, localChildNodes.length));
       setProjectedIndex(clamped);
+      setPlaceholderStage('close');
+      setTimeout(() => setPlaceholderStage('active'), 0);
     } else {
       setProjectedIndex(null);
+      setPlaceholderStage(null);
     }
   };
 
@@ -232,9 +237,10 @@ export const GroupNodeWithDndKit = ({
             return (
               <Box key={childNode.id} className={`view-child ${isHidden ? 'no-space' : ''}`}>
                 {activeId != null && projectedIndex === index ? (
-                  <Box
-                    className="view-child"
-                    style={{ height: overlaySize?.height ?? 56, borderRadius: 8, border: '2px dashed hsl(var(--border) / 0.5)', marginTop: 4, marginBottom: 4 }}
+                  <DividerWithHover
+                    isDragging={true}
+                    isActive={placeholderStage === 'active'}
+                    extraClass={placeholderStage === 'close' ? 'close' : ''}
                   />
                 ) : null}
                 <DraggableChildNode
@@ -250,9 +256,10 @@ export const GroupNodeWithDndKit = ({
             );
           })}
           {activeId != null && projectedIndex === localChildNodes.length ? (
-            <Box
-              className="view-child"
-              style={{ height: overlaySize?.height ?? 56, borderRadius: 8, border: '2px dashed hsl(var(--border) / 0.5)', marginTop: 4, marginBottom: 4 }}
+            <DividerWithHover
+              isDragging={true}
+              isActive={placeholderStage === 'active'}
+              extraClass={placeholderStage === 'close' ? 'close' : ''}
             />
           ) : null}
         </Box>

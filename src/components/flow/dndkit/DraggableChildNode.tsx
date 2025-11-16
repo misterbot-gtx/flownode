@@ -45,19 +45,14 @@ export const DraggableChildNode = memo(
         borderRadius="lg"
         borderWidth="1px"
         borderColor={isDragOver ? 'hsl(var(--primary))' : 'hsl(var(--border) / 0.3)'}
-        bg={isDragOver ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--flow-node) / 0.8)'}
+        bg={isDragOver ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--flow-node) / 1.0)'}
         transition="all 0.2s"
         boxShadow={isDragOver ? 'lg' : 'none'}
         opacity={0.9}
         className={`nodrag ${hidden ? 'dragging-hidden' : ''}`}
+        data-node-id={node.id}
         {...attributes}
         {...listeners}
-        onMouseDown={(e) => {
-          if (onDragStart) onDragStart(node);
-        }}
-        onMouseUp={() => {
-          if (onDragEnd) onDragEnd();
-        }}
       >
         <Flex align="center" gap="2" mb="2">
           <Text fontSize="sm">{nodeData.element?.icon}</Text>

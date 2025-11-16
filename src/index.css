@@ -279,14 +279,11 @@ All colors MUST be HSL.
   margin-bottom: 0;
 }
 
-/* Remover apenas o espaço reservado sem afetar o drag element */
 .view-divider.close {
-  display: none;
+  margin-bottom: 0 !important;
+  height: 0;
 }
 
-.view-child.no-space {
-  margin-bottom: 0 !important;
-}
 
 /* Estados especiais para dividers */
 .view-divider {

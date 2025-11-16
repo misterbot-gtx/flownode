@@ -1,4 +1,4 @@
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent, PointerSensor, useSensor, useSensors, MeasuringStrategy, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useEffect, useRef, useState } from 'react';
 import { Node } from '@flow/react';
@@ -16,6 +16,7 @@ interface GroupNodeWithDndKitProps {
   onDragStart: (node: Node) => void;
   onDragEnd: () => void;
   onDrop: (active: Node, overId?: string, index?: number, event?: DragEndEvent) => void;
+  groupId: string;
 }
 
 export const GroupNodeWithDndKit = ({
@@ -27,10 +28,17 @@ export const GroupNodeWithDndKit = ({
   onDragStart,
   onDragEnd,
   onDrop,
+  groupId,
 }: GroupNodeWithDndKitProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [overlayHidden, setOverlayHidden] = useState(false);
+  const dragStartInfoRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const [overlaySize, setOverlaySize] = useState<{ width: number; height: number } | null>(null);
+  const [projectedIndex, setProjectedIndex] = useState<number | null>(null);
+
+  const EXTRACT_MIN_DISTANCE = 24; // distância mínima para considerar extração
+  const EXTRACT_PRESS_DELAY = 180; // ms de press delay para considerar extração
 
   useEffect(() => {
     const onPointerMove = (ev: PointerEvent) => {
@@ -54,7 +62,7 @@ export const GroupNodeWithDndKit = ({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { delay: 120, tolerance: 5 },
     })
   );
 
@@ -62,6 +70,28 @@ export const GroupNodeWithDndKit = ({
     const { active } = event;
     setActiveId(active.id as string);
     setOverlayHidden(false);
+    try {
+      const el = document.querySelector(`.react-flow__node[data-id="${groupId}"] .view .view-child [data-node-id="${active.id}"]`) as HTMLElement | null;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setOverlaySize({ width: r.width, height: r.height });
+      } else {
+        setOverlaySize(null);
+      }
+    } catch {
+      setOverlaySize(null);
+    }
+    const nativeEvent = (event as any).event as MouseEvent | PointerEvent | TouchEvent | undefined;
+    if (nativeEvent && 'clientX' in nativeEvent && 'clientY' in nativeEvent) {
+      dragStartInfoRef.current = { x: (nativeEvent as any).clientX, y: (nativeEvent as any).clientY, t: Date.now() };
+    } else {
+      const lp = lastPointerRef.current || (window as any).__lastPointer;
+      if (lp) {
+        dragStartInfoRef.current = { x: lp.x, y: lp.y, t: Date.now() };
+      } else {
+        dragStartInfoRef.current = { x: 0, y: 0, t: Date.now() };
+      }
+    }
     const node = localChildNodes.find((n) => n.id === active.id);
     if (node) onDragStart(node);
   };
@@ -69,34 +99,47 @@ export const GroupNodeWithDndKit = ({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    
-    // Verifica se o drop foi fora do grupo
-    if (!over) {
+    setProjectedIndex(null);
+    const nativeEvent = (event as any).event as MouseEvent | PointerEvent | TouchEvent | undefined;
+    let finalX: number | undefined;
+    let finalY: number | undefined;
+    if (nativeEvent && 'clientX' in nativeEvent && 'clientY' in nativeEvent) {
+      finalX = (nativeEvent as any).clientX;
+      finalY = (nativeEvent as any).clientY;
+    } else if (nativeEvent && 'touches' in nativeEvent && (nativeEvent as any).touches?.length > 0) {
+      const touch = (nativeEvent as any).touches[0];
+      finalX = touch.clientX;
+      finalY = touch.clientY;
+    }
+    const groupEl = document.querySelector(`.react-flow__node[data-id="${groupId}"]`) as HTMLElement | null;
+    const outsideGroup = (() => {
+      const pointer = (typeof finalX === 'number' && typeof finalY === 'number')
+        ? { x: finalX, y: finalY }
+        : (lastPointerRef.current || (window as any).__lastPointer);
+      if (!groupEl || !pointer) return false;
+      const r = groupEl.getBoundingClientRect();
+      return pointer.x < r.left || pointer.x > r.right || pointer.y < r.top || pointer.y > r.bottom;
+    })();
+
+    if (!over || outsideGroup) {
       // soltou fora do grupo → extrair para o canvas
       const node = localChildNodes.find((n) => n.id === active.id);
       if (node) {
-        setOverlayHidden(true);
-        // Usa coordenadas reais do evento de ponteiro, evitando usar delta
-        const nativeEvent = (event as any).event as MouseEvent | PointerEvent | TouchEvent | undefined;
-        let finalX: number | undefined;
-        let finalY: number | undefined;
+        const startInfo = dragStartInfoRef.current;
+        const now = Date.now();
+        const pressDuration = startInfo ? now - startInfo.t : 0;
+        const dx = typeof finalX === 'number' && startInfo ? finalX - startInfo.x : 0;
+        const dy = typeof finalY === 'number' && startInfo ? finalY - startInfo.y : 0;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (nativeEvent && 'clientX' in nativeEvent && 'clientY' in nativeEvent) {
-          finalX = (nativeEvent as any).clientX;
-          finalY = (nativeEvent as any).clientY;
-        } else if (nativeEvent && 'touches' in nativeEvent && (nativeEvent as any).touches?.length > 0) {
-          const touch = (nativeEvent as any).touches[0];
-          finalX = touch.clientX;
-          finalY = touch.clientY;
+        const canExtract = distance >= EXTRACT_MIN_DISTANCE || pressDuration >= EXTRACT_PRESS_DELAY;
+
+        if (!canExtract) {
+          setOverlayHidden(false);
+          onDragEnd();
+          return;
         }
-
-        console.log('🎯 DNDKIT DRAG END - FORA DO GRUPO (coords resolvidas):', {
-          nodeId: node.id,
-          nodeName: (node.data as any)?.label,
-          hasNativeEvent: !!nativeEvent,
-          finalX,
-          finalY
-        });
+        setOverlayHidden(true);
 
         if (typeof finalX === 'number' && typeof finalY === 'number') {
           // Dispara evento global com coordenadas exatas
@@ -111,7 +154,6 @@ export const GroupNodeWithDndKit = ({
             },
           });
           window.dispatchEvent(customEvent);
-          console.log('✅ Evento groupExtract disparado pelo DnDKit com coordenadas:', { finalX, finalY });
           onDragEnd();
         } else {
           const lp = lastPointerRef.current || (window as any).__lastPointer;
@@ -127,7 +169,6 @@ export const GroupNodeWithDndKit = ({
               },
             });
             window.dispatchEvent(customEvent);
-            console.log('✅ groupExtract usando lastPointer', lp);
             onDragEnd();
           } else {
             console.warn('⚠️ Coordenadas não disponíveis, fallback para onDrop');
@@ -143,14 +184,39 @@ export const GroupNodeWithDndKit = ({
     const overId = over.id as string;
     const overIndex = localChildNodes.findIndex((n) => n.id === overId);
     const node = localChildNodes.find((n) => n.id === active.id);
-    if (node && overIndex !== -1) onDrop(node, overId, overIndex, event);
+    const finalIndex = projectedIndex != null ? projectedIndex : overIndex;
+    if (node && finalIndex !== -1) onDrop(node, overId, finalIndex, event);
     onDragEnd();
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!active || !over) {
+      setProjectedIndex(null);
+      return;
+    }
+    const overIndex = localChildNodes.findIndex((n) => n.id === (over.id as string));
+    const activeIndex = localChildNodes.findIndex((n) => n.id === (active.id as string));
+    if (overIndex !== -1) {
+      const idx = activeIndex < overIndex ? overIndex + 1 : overIndex;
+      const clamped = Math.max(0, Math.min(idx, localChildNodes.length));
+      setProjectedIndex(clamped);
+    } else {
+      setProjectedIndex(null);
+    }
   };
 
   const activeNode = activeId ? localChildNodes.find((n) => n.id === activeId) : null;
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      collisionDetection={closestCenter}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+    >
       <SortableContext items={localChildNodes.map((n) => n.id)} strategy={verticalListSortingStrategy}>
         <Box className="view-content">
           {/* Divider no topo */}
@@ -165,6 +231,12 @@ export const GroupNodeWithDndKit = ({
             const isActive = dragOverIndex === index + 1 && draggedChildId !== childNode.id;
             return (
               <Box key={childNode.id} className={`view-child ${isHidden ? 'no-space' : ''}`}>
+                {activeId != null && projectedIndex === index ? (
+                  <Box
+                    className="view-child"
+                    style={{ height: overlaySize?.height ?? 56, borderRadius: 8, border: '2px dashed hsl(var(--border) / 0.5)', marginTop: 4, marginBottom: 4 }}
+                  />
+                ) : null}
                 <DraggableChildNode
                   node={childNode}
                   index={index}
@@ -177,6 +249,12 @@ export const GroupNodeWithDndKit = ({
               </Box>
             );
           })}
+          {activeId != null && projectedIndex === localChildNodes.length ? (
+            <Box
+              className="view-child"
+              style={{ height: overlaySize?.height ?? 56, borderRadius: 8, border: '2px dashed hsl(var(--border) / 0.5)', marginTop: 4, marginBottom: 4 }}
+            />
+          ) : null}
         </Box>
       </SortableContext>
       {typeof document !== 'undefined'
@@ -184,28 +262,29 @@ export const GroupNodeWithDndKit = ({
             <DragOverlay dropAnimation={null}>
               {activeNode ? (
                 <Box
-                  className="dragging-previews"
-                  style={{
-                    width: '18rem',
-                    border: '3px solid #ea580c',
-                    background: 'rgb(24 24 27)',
-                    opacity: overlayHidden ? 0 : 1,
-                    borderRadius: 8,
-                    filter: 'none',
-                    transform: 'rotate(0deg)',
-                    transition: 'box-shadow 0.2s, border 0.2s, transform 0.3s cubic-bezier(0.4,0,0.2,1)',
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    padding: '7.5px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                  }}
+                  opacity={overlayHidden ? 0 : 1}
+                  style={overlaySize ? { width: `${overlaySize.width}px`, height: `${overlaySize.height}px` } : undefined}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  borderColor="hsl(var(--border) / 0.3)"
+                  bg="hsl(var(--flow-node) / 1.0)"
+                  p="3"
+                  boxShadow="lg"
+                  pointerEvents="none"
+                  userSelect="none"
                 >
-                  <Flex align="center" gap="2">
-                    <Text fontSize="lg">{(activeNode.data as any).element?.icon}</Text>
-                    <Text fontSize="sm" fontWeight="medium" color="white">
+                  <Flex align="center" gap="2" mb="2">
+                    <Text fontSize="sm">{(activeNode.data as any).element?.icon}</Text>
+                    <Text fontSize="xs" fontWeight="medium" color="hsl(var(--foreground))">
                       {(activeNode.data as any).label}
                     </Text>
+                    <Box as="span" fontSize="xs" color="hsl(var(--muted-foreground))" bg="hsl(var(--muted))" px="1" py="0.5" borderRadius="sm">
+                      Grupo
+                    </Box>
                   </Flex>
+                  <Text fontSize="xs" color="hsl(var(--muted-foreground))">
+                    {(activeNode.data as any).content || 'Clique para editar...'}
+                  </Text>
                 </Box>
               ) : null}
             </DragOverlay>,

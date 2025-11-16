@@ -135,6 +135,38 @@ export function useFlowLogic() {
   }, [addDebugLog]);
 
   useEffect(() => {
+    const onChildNodeDrop = (ev: any) => {
+      try {
+        const detail = ev?.detail || {};
+        const groupId = detail.groupId as string;
+        const elementId = detail.elementId as string;
+        const targetIndex = Number(detail.targetIndex ?? 0);
+        if (!groupId || !elementId) return;
+
+        setNodes((nds) => {
+          const nonGroupNodes = nds.filter(n => !n.parentId || n.parentId !== groupId);
+          const groupChildNodes = nds.filter(n => n.parentId === groupId);
+          const from = groupChildNodes.findIndex(n => n.id === elementId);
+          if (from === -1) return nds;
+          const copy = [...groupChildNodes];
+          const [removed] = copy.splice(from, 1);
+          const to = Math.max(0, Math.min(targetIndex, copy.length));
+          copy.splice(to, 0, removed);
+          const finalNodes = [...nonGroupNodes, ...copy];
+          addDebugLog('success', 'Reordenado filho do grupo', { groupId, elementId, from, to });
+          return finalNodes;
+        });
+      } catch (e) {
+        addDebugLog('error', 'Erro ao reordenar filho do grupo', e);
+      }
+    };
+    window.addEventListener('childNodeDrop', onChildNodeDrop as any);
+    return () => {
+      window.removeEventListener('childNodeDrop', onChildNodeDrop as any);
+    };
+  }, [setNodes, addDebugLog]);
+
+  useEffect(() => {
     if (pendingGroupDrop) {
       try {
         const element = JSON.parse(pendingGroupDrop.elementData) as FlowElement;
@@ -573,6 +605,63 @@ export function useFlowLogic() {
     }
   }, [nodes, setNodes, nodeId, setNodeId, addDebugLog]);
 
+  const moveNodeToGroupAtScreenPoint = useCallback((node: Node, targetGroupId: string, screenPoint: { x: number; y: number }) => {
+    try {
+      const reactFlowInstance = reactFlowRef.current;
+      const flowPoint = reactFlowInstance
+        ? reactFlowInstance.screenToFlowPosition({ x: screenPoint.x, y: screenPoint.y })
+        : { x: screenPoint.x, y: screenPoint.y } as any;
+
+      const targetGroup = nodes.find(n => n.id === targetGroupId);
+      if (!targetGroup) {
+        return;
+      }
+
+      const relX = Math.max(16, flowPoint.x - targetGroup.position.x);
+      const relY = Math.max(80, flowPoint.y - targetGroup.position.y);
+
+      setNodes((nds) => {
+        const withoutNode = nds.filter(n => n.id !== node.id);
+        const nonGroupNodes = withoutNode.filter(n => !n.parentId || n.parentId !== targetGroup.id);
+        const groupChildNodes = withoutNode.filter(n => n.parentId === targetGroup.id);
+
+        const movedNode: Node = {
+          ...node,
+          position: { x: targetGroup.position.x + relX, y: targetGroup.position.y + relY },
+          parentId: targetGroup.id,
+          data: { ...(node.data as any), parentGroupId: targetGroup.id },
+        };
+
+        let insertIndex = groupChildNodes.length;
+        const container = document.querySelector(`.react-flow__node[data-id="${targetGroup.id}"] .view`) as HTMLElement | null;
+        if (container) {
+          const childrenEls = Array.from(container.querySelectorAll('.view-child')).filter((el) => !el.classList.contains('no-space')) as HTMLElement[];
+          for (let i = 0; i < childrenEls.length; i++) {
+            const r = childrenEls[i].getBoundingClientRect();
+            const mid = r.top + r.height / 2;
+            if (screenPoint.y < mid) { insertIndex = i; break; }
+            insertIndex = i + 1;
+          }
+        }
+
+        const childrenToInsert = [...groupChildNodes];
+        childrenToInsert.splice(insertIndex, 0, movedNode);
+        const finalNodes = [...nonGroupNodes, ...childrenToInsert];
+
+        addDebugLog('success', 'Nó movido para dentro do grupo', {
+          nodeId: movedNode.id,
+          groupId: targetGroup.id,
+          position: movedNode.position,
+          dropIndex: insertIndex,
+        });
+
+        return finalNodes;
+      });
+    } catch (error) {
+      addDebugLog('error', 'Erro ao mover nó para grupo', error);
+    }
+  }, [nodes, setNodes, addDebugLog]);
+
   // Função para remover elemento do grupo e criar nó independente
   const handleRemoveChildFromGroup = useCallback((
     event: React.DragEvent,
@@ -863,5 +952,6 @@ export function useFlowLogic() {
     addElementAtScreenPoint,
     extractChildToCanvasAtScreenPoint,
     addElementToGroupAtScreenPoint,
+    moveNodeToGroupAtScreenPoint,
   };
 }

@@ -133,6 +133,27 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
   // NOVO: Armazenar a calculatedPosition para posicionamento exato
   const [calculatedPosition, setCalculatedPosition] = useState<{ x: number, y: number } | null>(null);
   const { setNodeRef } = useDroppable({ id });
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const onPointerMove = (ev: PointerEvent) => {
+      lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
+      (window as any).__lastPointer = lastPointerRef.current;
+    };
+    const onTouchMove = (ev: TouchEvent) => {
+      const t = ev.touches && ev.touches[0];
+      if (t) {
+        lastPointerRef.current = { x: t.clientX, y: t.clientY };
+        (window as any).__lastPointer = lastPointerRef.current;
+      }
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('touchmove', onTouchMove);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('touchmove', onTouchMove);
+    };
+  }, []);
 
   // Usar ref para armazenar o timestamp da última atualização
   const lastUpdateRef = useRef<number>((groupData as any)._updateTimestamp || 0);
@@ -507,7 +528,7 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
             onKeyDown={handleKeyDown}
             fontSize="sm"
             fontWeight="semibold"
-            variant="unstyled"
+            variant="outline"
             size="sm"
             h="1.25rem"
             lineHeight="1.25rem"
@@ -564,15 +585,37 @@ export const GroupNode = memo(({ data, id, selected }: GroupNodeProps) => {
             }}
             onDrop={(active, overId, index, evt) => {
               if (!overId) {
-                // soltou fora do grupo → extrair para o canvas
                 const nativeEv = (evt as any)?.event as MouseEvent | PointerEvent | TouchEvent | undefined;
-                const clientX = nativeEv && 'clientX' in nativeEv ? (nativeEv as any).clientX : undefined;
-                const clientY = nativeEv && 'clientY' in nativeEv ? (nativeEv as any).clientY : undefined;
-                const customEvent = new CustomEvent('groupExtract', {
-                  detail: { groupId: id, node: active, clientX, clientY },
-                });
-                window.dispatchEvent(customEvent);
-                // remove da lista local
+                let clientX: number | undefined;
+                let clientY: number | undefined;
+
+                if (nativeEv && 'clientX' in nativeEv && 'clientY' in nativeEv) {
+                  clientX = (nativeEv as any).clientX;
+                  clientY = (nativeEv as any).clientY;
+                } else if (nativeEv && 'touches' in nativeEv && (nativeEv as any).touches?.length > 0) {
+                  const touch = (nativeEv as any).touches[0];
+                  clientX = touch.clientX;
+                  clientY = touch.clientY;
+                } else {
+                  const lp = lastPointerRef.current || (window as any).__lastPointer;
+                  if (lp) {
+                    clientX = lp.x;
+                    clientY = lp.y;
+                  }
+                }
+
+                if (typeof clientX === 'number' && typeof clientY === 'number') {
+                  const customEvent = new CustomEvent('groupExtract', {
+                    detail: { groupId: id, node: active, clientX, clientY, timestamp: Date.now(), source: 'group-node-extract-final' },
+                  });
+                  window.dispatchEvent(customEvent);
+                } else {
+                  const customEvent = new CustomEvent('groupExtract', {
+                    detail: { groupId: id, node: active, fallback: true, timestamp: Date.now(), source: 'group-node-extract-error' },
+                  });
+                  window.dispatchEvent(customEvent);
+                }
+
                 setLocalChildNodes((prev) => prev.filter((n) => n.id !== active.id));
               } else {
                 // soltou dentro do grupo → reordenar

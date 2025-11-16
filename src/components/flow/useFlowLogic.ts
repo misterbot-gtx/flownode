@@ -7,7 +7,7 @@ import {
   Node,
   ReactFlowInstance,
 } from '@flow/react';
-import { FlowElement } from '../../types/flow';
+import { FlowElement } from '@/types/flow';
 import StartNode from './nodes/StartNode';
 import TextNode from './nodes/TextNode';
 import ImageNode from './nodes/ImageNode';
@@ -430,14 +430,40 @@ export function useFlowLogic() {
         return;
       }
 
-      const dropPosition = reactFlowRef.current
-        ? reactFlowRef.current.screenToFlowPosition({ x: screenPoint.x, y: screenPoint.y })
-        : { x: screenPoint.x, y: screenPoint.y } as any;
+      // Converte coordenadas da tela para coordenadas do React Flow
+      let dropPosition;
+      if (reactFlowRef.current) {
+        // Usa o método oficial do React Flow para converter coordenadas da tela para o canvas
+        dropPosition = reactFlowRef.current.screenToFlowPosition({ 
+          x: screenPoint.x, 
+          y: screenPoint.y 
+        });
+      } else {
+        // Fallback: usa coordenadas da tela direto
+        dropPosition = { x: screenPoint.x, y: screenPoint.y } as any;
+      }
+
+      console.log('🎯 EXTRACT CHILD TO CANVAS - POSICIONAMENTO EXATO:', {
+        childNodeId: childNode.id,
+        childLabel: (childNode.data as any)?.label,
+        groupId: parentGroup.id,
+        groupTitle: parentGroup.data?.title,
+        screenPoint: screenPoint,
+        dropPosition: dropPosition,
+        method: 'screen-to-flow-conversion',
+        reactFlowInstance: !!reactFlowRef.current
+      });
+
+      // Garante que a posição esteja dentro de limites razoáveis
+      const finalPosition = {
+        x: Math.max(0, dropPosition.x),
+        y: Math.max(0, dropPosition.y)
+      };
 
       const newIndependentNode: Node = {
         ...childNode,
         id: `${childNode.id}-independent-${Date.now()}`,
-        position: dropPosition,
+        position: finalPosition,
         parentId: undefined,
         data: {
           ...childNode.data,
@@ -462,12 +488,14 @@ export function useFlowLogic() {
 
         const finalNodes = [...updatedGroup, newIndependentNode];
 
-        addDebugLog('success', 'Elemento removido do grupo via dnd-kit e tornado independente', {
+        addDebugLog('success', 'Elemento removido do grupo e posicionado exatamente onde foi solto', {
           originalChildId: childNode.id,
           newIndependentId: newIndependentNode.id,
           groupId: parentGroup.id,
-          dropPosition,
-          method: 'dnd-kit-extract-to-canvas',
+          dropPosition: finalPosition,
+          screenPoint,
+          method: 'precise-drop-positioning',
+          conversionMethod: 'screenToFlowPosition'
         });
 
         return finalNodes;
@@ -475,8 +503,8 @@ export function useFlowLogic() {
 
       setDraggingChildNode(null);
     } catch (error) {
-      console.error('❌ Erro ao remover elemento do grupo via dnd-kit:', error);
-      addDebugLog('error', 'Erro ao remover elemento do grupo via dnd-kit', error);
+      console.error('❌ Erro ao remover elemento do grupo:', error);
+      addDebugLog('error', 'Erro ao remover elemento do grupo', error);
     }
   }, [nodes, setNodes, addDebugLog]);
 

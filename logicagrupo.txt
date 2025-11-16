@@ -1,7 +1,5 @@
 Versão do projeto no GITHUB: v13
 
-1. Eu quero que melhore a logica quando for tirar o elemento do grupo quero que ele fique a onde  a pessoa soltou o elemento no flowbuider.
-
 2. Eu quero que quando tirar o elemento do grupo quero que mostre o preview onde ele pode ocupar na grupo caso a pessoa queira mudar a possição do item.
 
 

@@ -32,7 +32,7 @@ export const DraggableChildNode = memo(
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
-      opacity: isDragging ? 0 : undefined,
+      opacity: isDragging || hidden ? 0 : undefined,
     };
 
     return (
